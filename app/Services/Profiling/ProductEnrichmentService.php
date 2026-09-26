@@ -241,6 +241,9 @@ class ProductEnrichmentService
         if ($modelCode) {
             $clean = str_ireplace($modelCode, '', $clean);
         }
+        if ($brand && str_starts_with(mb_strtolower($clean, 'UTF-8'), mb_strtolower($brand, 'UTF-8'))) {
+            $clean = trim(substr($clean, strlen($brand)));
+        }
         // Remove multiple spaces
         $clean = trim(preg_replace('/\s+/', ' ', $clean));
 
