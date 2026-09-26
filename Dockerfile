@@ -1,4 +1,4 @@
-FROM php:8.3-fpm-alpine
+FROM php:8.4-fpm-alpine
 
 # Install system dependencies
 RUN apk add --no-cache \
@@ -13,6 +13,9 @@ RUN apk add --no-cache \
     freetype-dev \
     oniguruma-dev \
     netcat-openbsd
+
+# Configure git safe directory
+RUN git config --global --add safe.directory /var/www/html
 
 # Install PHP extensions
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
