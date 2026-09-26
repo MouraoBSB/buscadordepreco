@@ -65,6 +65,7 @@ class ProductSeeder extends Seeder
             [
                 'name' => 'Lavadora de Roupas Midea 16,5 kg Cinza Escuro Top Load',
                 'brand' => 'Midea',
+                'image_url' => '/images/products/midea-ma512w165.jpg',
                 'model_code' => 'MA512W165/GK-05',
                 'capacity_kg' => 16.5,
                 'voltage' => '220V',
@@ -85,6 +86,7 @@ class ProductSeeder extends Seeder
             [
                 'name' => 'Lavadora de Roupas Panasonic 18 kg Titânio Top Load',
                 'brand' => 'Panasonic',
+                'image_url' => '/images/products/panasonic-na-f180p7.jpg',
                 'model_code' => 'NA-F180P7',
                 'capacity_kg' => 18.0,
                 'voltage' => '220V',
@@ -105,6 +107,7 @@ class ProductSeeder extends Seeder
             [
                 'name' => 'Lavadora de Roupas Samsung 17 kg Ecobubble Top Load',
                 'brand' => 'Samsung',
+                'image_url' => '/images/products/samsung-wa17cg6746.jpg',
                 'model_code' => 'WA17CG6746BVBZ',
                 'capacity_kg' => 17.0,
                 'voltage' => '220V',
@@ -128,7 +131,7 @@ class ProductSeeder extends Seeder
             $alertRules = $prodData['alert_rules'];
             unset($prodData['alert_rules']);
 
-            $product = Product::firstOrCreate(
+            $product = Product::updateOrCreate(
                 ['model_code' => $prodData['model_code'], 'voltage' => $prodData['voltage']],
                 $prodData
             );

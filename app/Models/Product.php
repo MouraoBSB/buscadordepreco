@@ -13,6 +13,7 @@ class Product extends Model
     protected $fillable = [
         'name',
         'brand',
+        'image_url',
         'model_code',
         'capacity_kg',
         'voltage',

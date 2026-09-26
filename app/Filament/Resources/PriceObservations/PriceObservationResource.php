@@ -13,12 +13,23 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use UnitEnum;
 
 class PriceObservationResource extends Resource
 {
     protected static ?string $model = PriceObservation::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedChartBar;
+
+    protected static ?string $modelLabel = 'Observação de Preço';
+
+    protected static ?string $pluralModelLabel = 'Histórico de Preços';
+
+    protected static ?string $navigationLabel = 'Histórico de Preços';
+
+    protected static string|UnitEnum|null $navigationGroup = 'Monitoramento';
+
+    protected static ?int $navigationSort = 2;
 
     public static function form(Schema $schema): Schema
     {

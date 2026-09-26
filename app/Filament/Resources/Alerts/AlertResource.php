@@ -13,12 +13,23 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use UnitEnum;
 
 class AlertResource extends Resource
 {
     protected static ?string $model = Alert::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBellAlert;
+
+    protected static ?string $modelLabel = 'Alerta Disparado';
+
+    protected static ?string $pluralModelLabel = 'Alertas Enviados';
+
+    protected static ?string $navigationLabel = 'Alertas Enviados';
+
+    protected static string|UnitEnum|null $navigationGroup = 'Alertas WhatsApp';
+
+    protected static ?int $navigationSort = 2;
 
     public static function form(Schema $schema): Schema
     {

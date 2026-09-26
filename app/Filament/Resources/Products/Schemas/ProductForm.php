@@ -29,6 +29,11 @@ class ProductForm
                     ->required()
                     ->maxLength(100),
 
+                TextInput::make('image_url')
+                    ->label('Caminho ou URL da Foto do Produto')
+                    ->placeholder('ex: /images/products/midea-ma512w165.jpg')
+                    ->maxLength(500),
+
                 TextInput::make('capacity_kg')
                     ->label('Capacidade (kg)')
                     ->numeric()
