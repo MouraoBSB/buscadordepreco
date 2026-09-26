@@ -64,16 +64,66 @@ class ApiUsageLog extends Model
     }
 
     /**
+     * Total credits used this month for a specific purpose (profiling or discovery).
+     */
+    public static function getMonthlyUsageByPurpose(string $purpose, string $provider = 'tavily'): int
+    {
+        return (int) self::where('provider', $provider)
+            ->where('purpose', $purpose)
+            ->where('created_at', '>=', Carbon::now()->startOfMonth())
+            ->sum('credits_used');
+    }
+
+    /**
      * Get usage percentage of configured quota.
      */
-    public static function getMonthlyUsagePercentage(string $provider = 'tavily', int $quotaLimit = 1000): float
+    public static function getMonthlyUsagePercentage(string $provider = 'tavily', ?int $quotaLimit = null): float
     {
-        if ($quotaLimit <= 0) {
+        $limit = $quotaLimit ?? (int) config('services.tavily.monthly_limit', 1000);
+        if ($limit <= 0) {
             return 0.0;
         }
 
         $used = self::getMonthlyUsage($provider);
 
-        return round(($used / $quotaLimit) * 100, 1);
+        return round(($used / $limit) * 100, 1);
+    }
+
+    /**
+     * Health check and alert state for external quota.
+     *
+     * @return array{status: string, percentage: float, used: int, limit: int, remaining: int, circuit_breaker: bool, alert_level: ?string}
+     */
+    public static function getQuotaHealth(string $provider = 'tavily'): array
+    {
+        $limit = (int) config("services.{$provider}.monthly_limit", 1000);
+        $used = self::getMonthlyUsage($provider);
+        $pct = $limit > 0 ? round(($used / $limit) * 100, 1) : 0.0;
+        $remaining = max(0, $limit - $used);
+
+        $status = match (true) {
+            $pct >= 95.0 => 'bloqueado',
+            $pct >= 85.0 => 'critico',
+            $pct >= 70.0 => 'atencao',
+            default => 'normal',
+        };
+
+        $alertLevel = match (true) {
+            $pct >= 95.0 => '95% - Circuit Breaker Ativo (Descobertas Recorrentes Bloqueadas)',
+            $pct >= 85.0 => '85% - Atenção Crítica na Cota',
+            $pct >= 70.0 => '70% - Consumo Elevado',
+            default => null,
+        };
+
+        return [
+            'status' => $status,
+            'percentage' => $pct,
+            'used' => $used,
+            'limit' => $limit,
+            'remaining' => $remaining,
+            'circuit_breaker' => $pct >= 95.0,
+            'alert_level' => $alertLevel,
+        ];
     }
 }
+

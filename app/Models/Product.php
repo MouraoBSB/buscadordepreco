@@ -63,6 +63,11 @@ class Product extends Model
         return $this->hasMany(DiscoveryCandidate::class);
     }
 
+    public function candidates(): HasMany
+    {
+        return $this->hasMany(DiscoveryCandidate::class);
+    }
+
     public function discoveryRuns(): HasMany
     {
         return $this->hasMany(DiscoveryRun::class);

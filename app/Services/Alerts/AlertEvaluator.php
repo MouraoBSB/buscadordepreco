@@ -21,8 +21,8 @@ class AlertEvaluator
      */
     public function evaluate(PriceObservation $observation): void
     {
-        // Outlier and Mismatch check: Never alert on mismatch or out-of-stock
-        if ($observation->is_mismatch || ! $observation->in_stock) {
+        // Outlier and Mismatch check: Never alert on mismatch, out-of-stock or suspicious price
+        if ($observation->is_mismatch || ! $observation->in_stock || $observation->is_suspicious) {
             return;
         }
 
@@ -35,6 +35,37 @@ class AlertEvaluator
         $effectivePrice = $observation->effective_price;
 
         if ($effectivePrice === null || $effectivePrice <= 0) {
+            return;
+        }
+
+        // Price Sanity Check: If price drops >60% below target or historical average, mark suspicious and suppress alert
+        $isSuspicious = false;
+        $suspiciousReason = null;
+
+        if ($product->target_price && $effectivePrice < ((float) $product->target_price * 0.40)) {
+            $isSuspicious = true;
+            $suspiciousReason = 'PRICE_OUTLIER_DETECTED: Preço mais de 60% abaixo do preço-alvo. Possível erro de precificação ou anúncio de peças.';
+        } else {
+            $historicalAvg = PriceObservation::query()
+                ->whereHas('source', fn ($q) => $q->where('product_id', $product->id))
+                ->where('is_mismatch', false)
+                ->where('is_suspicious', false)
+                ->where('id', '!=', $observation->id)
+                ->avg('regular_price');
+
+            if ($historicalAvg && $effectivePrice < ((float) $historicalAvg * 0.40)) {
+                $isSuspicious = true;
+                $suspiciousReason = 'PRICE_OUTLIER_DETECTED: Preço mais de 60% abaixo da média histórica do produto.';
+            }
+        }
+
+        if ($isSuspicious) {
+            $observation->update([
+                'is_suspicious' => true,
+                'sanity_check_reason' => $suspiciousReason,
+            ]);
+            Log::warning("Alerta suprimido pelo Sanity Check para produto {$product->id}: R$ {$effectivePrice}. Motivo: {$suspiciousReason}");
+
             return;
         }
 

@@ -53,6 +53,13 @@ class ProductsTable
                     ->money('BRL')
                     ->sortable(),
 
+                TextColumn::make('candidates_count')
+                    ->label('Ofertas Descobertas')
+                    ->counts('candidates')
+                    ->badge()
+                    ->color('primary')
+                    ->sortable(),
+
                 IconColumn::make('active')
                     ->label('Ativo')
                     ->boolean(),
@@ -61,6 +68,24 @@ class ProductsTable
                 //
             ])
             ->recordActions([
+                \Filament\Actions\Action::make('discover')
+                    ->label('Buscar Ofertas')
+                    ->icon('heroicon-o-sparkles')
+                    ->color('success')
+                    ->requiresConfirmation()
+                    ->modalHeading('Descobrir Novas Ofertas')
+                    ->modalDescription('O PriceWatch pesquisará os varejistas e motores de busca para encontrar novas fontes de compra para este produto.')
+                    ->action(function (\App\Models\Product $record) {
+                        $service = app(\App\Services\Discovery\ProductDiscoveryService::class);
+                        $result = $service->discoverForProduct($record, triggerType: 'manual');
+
+                        \Filament\Notifications\Notification::make()
+                            ->title('Descoberta finalizada!')
+                            ->body("{$result['candidates_found']} ofertas analisadas: {$result['candidates_auto_approved']} auto-aprovadas, {$result['candidates_pending']} pendentes, {$result['candidates_rejected']} rejeitadas.")
+                            ->success()
+                            ->send();
+                    }),
+
                 EditAction::make(),
             ])
             ->toolbarActions([
