@@ -63,7 +63,14 @@ class ProductDiscoveryService
 
         // 1. Generate or prepare queries
         if (empty($queries)) {
-            $profile = $this->profiler->profileFromText($product->name, $product->target_price ? (float) $product->target_price : null);
+            $input = $product->name;
+            if ($product->model_code && ! str_contains($input, $product->model_code)) {
+                $input .= ' '.$product->model_code;
+            }
+            if ($product->voltage && ! str_contains($input, $product->voltage)) {
+                $input .= ' '.$product->voltage;
+            }
+            $profile = $this->profiler->profileFromText($input, $product->target_price ? (float) $product->target_price : null);
             $queries = $profile->suggestedQueries;
         }
 
