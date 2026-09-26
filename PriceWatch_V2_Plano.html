@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>PriceWatch V2 — Plano Arquitetural de Descoberta Automática de Ofertas</title>
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
+
+    @page {
+        size: A4;
+        margin: 14mm 14mm 14mm 14mm;
+        @bottom-right {
+            content: "Página " counter(page) " de " counter(pages);
+            font-family: 'Inter', sans-serif;
+            font-size: 8pt;
+            color: #94a3b8;
+        }
+    }
+
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+    }
+
+    body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        color: #1e293b;
+        background: #ffffff;
+        font-size: 8.8pt;
+        line-height: 1.48;
+    }
+
+    .cover {
+        padding: 28px 24px;
+        background: linear-gradient(135deg, #064e3b 0%, #0f172a 100%);
+        color: #ffffff;
+        border-radius: 10px;
+        margin-bottom: 18px;
+        page-break-after: avoid;
+    }
+
+    .cover-badge {
+        display: inline-block;
+        background: rgba(16, 185, 129, 0.25);
+        border: 1px solid #10b981;
+        color: #6ee7b7;
+        padding: 3px 10px;
+        border-radius: 20px;
+        font-size: 7.5pt;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        margin-bottom: 8px;
+    }
+
+    .cover h1 {
+        font-size: 19pt;
+        font-weight: 800;
+        line-height: 1.2;
+        margin-bottom: 5px;
+        color: #ffffff;
+    }
+
+    .cover h2 {
+        font-size: 11pt;
+        font-weight: 500;
+        color: #cbd5e1;
+        margin-bottom: 14px;
+    }
+
+    .cover-meta {
+        display: flex;
+        gap: 18px;
+        font-size: 7.8pt;
+        color: #94a3b8;
+        border-top: 1px solid rgba(255, 255, 255, 0.15);
+        padding-top: 10px;
+    }
+
+    .cover-meta span strong {
+        color: #f8fafc;
+    }
+
+    h2.section-title {
+        font-size: 11.5pt;
+        font-weight: 700;
+        color: #0f172a;
+        border-bottom: 2px solid #10b981;
+        padding-bottom: 3px;
+        margin-top: 16px;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        page-break-after: avoid;
+    }
+
+    h2.section-title::before {
+        content: "";
+        display: inline-block;
+        width: 5px;
+        height: 13px;
+        background: #10b981;
+        border-radius: 3px;
+        margin-right: 7px;
+    }
+
+    h3 {
+        font-size: 9.5pt;
+        font-weight: 700;
+        color: #1e293b;
+        margin-top: 10px;
+        margin-bottom: 4px;
+        page-break-after: avoid;
+    }
+
+    p {
+        margin-bottom: 7px;
+        color: #334155;
+    }
+
+    .callout {
+        background: #f8fafc;
+        border-left: 4px solid #10b981;
+        border-radius: 6px;
+        padding: 8px 11px;
+        margin: 8px 0;
+        font-size: 8.4pt;
+    }
+
+    .callout-warning {
+        background: #fffbeb;
+        border-left-color: #f59e0b;
+        color: #92400e;
+    }
+
+    .callout-info {
+        background: #f0fdf4;
+        border-left-color: #10b981;
+        color: #065f46;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 8px 0 12px 0;
+        font-size: 8pt;
+        page-break-inside: avoid;
+    }
+
+    th {
+        background: #0f172a;
+        color: #f8fafc;
+        font-weight: 600;
+        text-align: left;
+        padding: 5px 7px;
+        font-size: 7.6pt;
+    }
+
+    td {
+        padding: 5px 7px;
+        border-bottom: 1px solid #e2e8f0;
+        color: #334155;
+        vertical-align: top;
+    }
+
+    tr:nth-child(even) td {
+        background: #f8fafc;
+    }
+
+    .badge {
+        display: inline-block;
+        padding: 1px 5px;
+        border-radius: 3px;
+        font-size: 6.8pt;
+        font-weight: 700;
+    }
+
+    .badge-success { background: #dcfce7; color: #15803d; }
+    .badge-warning { background: #fef3c7; color: #b45309; }
+    .badge-danger { background: #fee2e2; color: #b91c1c; }
+    .badge-info { background: #e0f2fe; color: #0369a1; }
+    .badge-neutral { background: #f1f5f9; color: #475569; }
+
+    .diagram {
+        background: #0f172a;
+        color: #e2e8f0;
+        padding: 10px 12px;
+        border-radius: 7px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 7pt;
+        line-height: 1.38;
+        margin: 10px 0;
+        white-space: pre;
+        overflow-x: auto;
+        page-break-inside: avoid;
+    }
+
+    ul, ol {
+        margin: 4px 0 8px 16px;
+        color: #334155;
+    }
+
+    li {
+        margin-bottom: 2px;
+    }
+
+    .grid-2 {
+        display: flex;
+        gap: 10px;
+        margin: 8px 0;
+        page-break-inside: avoid;
+    }
+
+    .card {
+        flex: 1;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 8px 10px;
+        background: #ffffff;
+    }
+
+    .card-title {
+        font-weight: 700;
+        font-size: 8.3pt;
+        color: #0f172a;
+        margin-bottom: 3px;
+    }
+
+    .page-break {
+        page-break-before: always;
+    }
+</style>
+</head>
+<body>
+
+<!-- PÁGINA 1: CAPA & MUDANÇA DE PARADIGMA -->
+<div class="cover">
+    <div class="cover-badge">Arquitetura V2.2 — Especificação Técnica Definitiva</div>
+    <h1>PRICEWATCH V2</h1>
+    <h2>Product Profiling, Descoberta Inteligente e Motor Universal de Ofertas</h2>
+    <div class="cover-meta">
+        <span><strong>Versão:</strong> 2.2.0</span>
+        <span><strong>UX:</strong> Linguagem Natural com Profiling Automático</span>
+        <span><strong>Custo:</strong> R$ 0,00</span>
+        <span><strong>Data:</strong> Setembro de 2026</span>
+    </div>
+</div>
+
+<h2 class="section-title">1. Mudança de Paradigma: Centralidade Soberana no Produto</h2>
+<p>
+    Na versão V1, o sistema operava como um <em>monitor passivo de URLs</em>: o usuário precisava navegar manualmente na web, localizar o link de cada loja e colar uma a uma no painel.
+</p>
+<p>
+    No <strong>PriceWatch V2</strong>, a experiência do usuário é totalmente invertida: o usuário informa apenas em <strong>linguagem natural</strong> o que deseja monitorar (ex: <code>LG OLED C6 55 polegadas</code> ou <code>Midea 16,5 kg 220V sem agitador</code>). O robô interpreta as especificações, infere atributos técnicos, identifica onde o produto é vendido no Brasil, filtra ofertas incompatíveis e inicia o monitoramento de preços.
+</p>
+
+<div class="grid-2">
+    <div class="card" style="border-top: 3px solid #64748b;">
+        <div class="card-title">Fluxo Anterior (V1 - Passivo & Burocrático)</div>
+        <p style="font-size: 7.8pt; margin: 0; color: #64748b;">
+            Usuário pesquisa no Google → Garimpa link da loja → Cria Fonte manualmente → Sistema apenas coleta o preço daquela URL cadastrada.
+        </p>
+    </div>
+    <div class="card" style="border-top: 3px solid #10b981; background: #f0fdf4;">
+        <div class="card-title" style="color: #065f46;">Novo Fluxo (V2 - Autônomo, Inteligente & Universal)</div>
+        <p style="font-size: 7.8pt; margin: 0; color: #166534;">
+            Usuário digita o produto em texto livre → Robô faz <strong>Product Profiling</strong> → Apresenta resumo em 1 clique → Varre a web via Discovery → Monitora e alerta no WhatsApp.
+        </p>
+    </div>
+</div>
+
+<div class="callout callout-info">
+    <strong>Separação Conceitual das Quatro Etapas:</strong>
+    <br>1. <strong>PROFILING & ENRICHMENT:</strong> <em>"O que exatamente é este produto, qual sua marca, modelo oficial e atributos?"</em>
+    <br>2. <strong>QUERY EXPANSION:</strong> <em>"Quais consultas otimizadas afunilam os resultados na internet?"</em>
+    <br>3. <strong>DISCOVERY:</strong> <em>"Quais lojas e páginas vendem este produto na internet?"</em>
+    <br>4. <strong>COLLECTION:</strong> <em>"Quanto custa hoje este produto nas fontes já validadas e ativas?"</em>
+</div>
+
+<div class="page-break"></div>
+
+<!-- PÁGINA 2: CAMADA DE PRODUCT PROFILING & ENRICHMENT -->
+<h2 class="section-title">2. Camada de Product Profiling & Enrichment Service</h2>
+<p>
+    Para eliminar a exigência de conhecimento técnico do usuário (como digitar regex, códigos de fábrica ou listas manuais de termos proibidos), introduzimos o serviço <code>ProductEnrichmentService</code>. Ele executa uma varredura preliminar instantânea a partir do texto informal digitado pelo usuário.
+</p>
+
+<h3>A Distinção Fundamental: Hard Constraints vs. Inferred Attributes</h3>
+<p>
+    O coração do motor de enriquecimento reside na separação estrita entre o que o usuário exigiu e o que o sistema descobriu:
+</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>Tipo de Dado</th>
+            <th>Origem</th>
+            <th>Exemplos Práticos</th>
+            <th>Comportamento no Validador</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Hard Constraints</strong><br><span class="badge badge-danger">Restrições Rígidas</span></td>
+            <td>Informadas explicitamente pelo <strong>Usuário</strong></td>
+            <td>`220V`, `55 polegadas`, `sem agitador`, `16GB RAM`, `cor Titânio`</td>
+            <td><strong>Eliminatório Absoluto:</strong> Se a oferta violar qualquer restrição rígida (ex: achar 110V ou TV de 43"), é <strong>REJEITADA NA HORA</strong>. O robô nunca desrespeita o usuário.</td>
+        </tr>
+        <tr>
+            <td><strong>Inferred Attributes</strong><br><span class="badge badge-info">Atributos Deduzidos</span></td>
+            <td>Descobertos na web pelo <strong>Sistema</strong></td>
+            <td>Código `OLED55C6P`, resolução 4K, painel 120Hz, SKU comercial de fábrica</td>
+            <td><strong>Classificatório (+Score):</strong> Aumenta a pontuação de confiança se presentes, mas <strong>NÃO descarta o anúncio</strong> caso o lojista tenha omitido o detalhe no título.</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>Auto-Geração Inteligente de Termos de Proteção</h3>
+<p>
+    O <code>ProductEnrichmentService</code> deriva automaticamente as regras de proteção sem intervenção humana:
+</p>
+<ul>
+    <li><strong>Regra de Opostos:</strong> Se o usuário exigiu <code>220V</code>, o sistema adiciona automaticamente como <em>Termos Proibidos</em>: <code>["110V", "127V", "110 volts"]</code>. Se exigiu <code>55"</code>, exclui <code>["43", "48", "65", "75"]</code>.</li>
+    <li><strong>Filtro Universal Anti-Acessórios:</strong> O sistema injeta automaticamente termos eliminatórios como: <code>["peça", "placa", "suporte", "capa", "filtro", "acessório", "controle remoto", "usado", "defeito"]</code>, impedindo que peças de reposição sejam confundidas com o produto original.</li>
+</ul>
+
+<div class="callout callout-warning">
+    <strong>Card de Confirmação Rápida no Filament:</strong>
+    <br>Ao digitar o nome do produto, o usuário vê um resumo visual:
+    <br><em>"Identificamos: Smart TV LG 55" OLED Série C6 (Modelo provável: OLED55C6P). Restrição fixada: 55 polegadas. [ ✓ Confirmar e Buscar Ofertas ] [ ⚙ Modo Avançado ]"</em>.
+</div>
+
+<div class="page-break"></div>
+
+<!-- PÁGINA 3: ARQUITETURA DO SUBSISTEMA & QUERY EXPANSION -->
+<h2 class="section-title">3. Arquitetura do Subsistema e Refinamento de Busca</h2>
+<p>
+    O fluxo completo opera com aprendizado iterativo de consultas (<em>Funnel Query Expansion</em>):
+</p>
+
+<div class="diagram">
++----------------------------------------------------------------------------------------------------+
+|                                    FLUXO COMPLETO DO PRICEWATCH V2                                 |
++----------------------------------------------------------------------------------------------------+
+                                                  │
+                               [ INPUT EM LINGUAGEM NATURAL ]
+                      (ex: "LG OLED C6 55 polegadas" ou "Midea 16,5 kg 220V")
+                                                  │
+                                                  ▼
+                                  ┌───────────────────────────────┐
+                                  │   ProductEnrichmentService    │
+                                  └───────────────┬───────────────┘
+            Extrai Hard Constraints e infere:     │
+            - Categoria, Marca, Nome Comercial    │
+            - Código/SKU provável na web          │
+            - Termos Proibidos automáticos        │
+                                                  ▼
+                                  ┌───────────────────────────────┐
+                                  │   Card de Confirmação Rápida  │
+                                  │   "Entendi que este é o prod. │
+                                  │    Deseja iniciar a busca?"   │
+                                  └───────────────┬───────────────┘
+                                                  ▼
+                                  ┌───────────────────────────────┐
+                                  │ Funnel Query Expansion Engine │
+                                  └───────────────┬───────────────┘
+            Busca 1 (Ampla): "LG OLED C6 55"      │
+            Detecta modelo dominante "OLED55C6P"  │
+            Busca 2 (Afunilada): "LG OLED C6" "OLED55C6P"
+                                                  ▼
+                  ┌───────────────────────────────────────────────┐
+                  │           DiscoveryProviderManager            │
+                  └───────┬───────────────────────┬───────────────┘
+                          │                       │
+                          ▼                       ▼
+            ┌──────────────────────────┐ ┌──────────────────────────┐
+            │  DirectStoreProvider     │ │     TavilyProvider       │
+            │  (Catálogo Oficial VTEX) │ │ (Busca Web 1.000/mês free│
+            └─────────────┬────────────┘ └────────────┬─────────────┘
+                          └───────────────┬───────────┘
+                                          ▼
+                               [ CANDIDATOS BRUTOS ]
+                                          │
+                                          ▼
+                             ┌─────────────────────────┐
+                             │ GenericCandidateValidator
+                             └────────────┬────────────┘
+        Aplica Regras do Produto:         │
+        - Rejeita se violar Hard Constraint
+        - Rejeita se contiver Termo Proibido
+        - Pondera Inferred Attributes     │
+        - Deduplica por SHA-256 da URL    │
+                                          ▼
+                             ┌─────────────────────────┐
+                             │    CandidateScorer      │
+                             └────────────┬────────────┘
+        Confidence Score (0 a 100):       │
+        - Modelo exato (se houver): +40   │
+        - Hard Constraints satisfeitas:+35│
+        - Marca confirmada: +15           │
+        - Estrutura de produto válida: +10│
+                                          ▼
+             ┌────────────────────────────┼────────────────────────────┐
+             ▼                            ▼                            ▼
+   [ SCORE >= 85 (Alta) ]       [ SCORE 60-84 (Média) ]       [ SCORE < 60 ou Rejeição ]
+             │                            │                            │
+             ▼                            ▼                            ▼
+   STATUS: AUTO_APPROVED        STATUS: PENDING_REVIEW              STATUS: REJECTED
+   Cria ProductSource e         Envia para tela Filament       Armazena auditoria e motivo
+   dispara primeira coleta      [Aprovar] [Rejeitar]                da rejeição técnica
+</div>
+
+<div class="page-break"></div>
+
+<!-- PÁGINA 4: AVALIAÇÃO DE TECNOLOGIAS EM SETEMBRO DE 2026 -->
+<h2 class="section-title">4. Avaliação de Tecnologias de Busca (Cenário Oficial 2026)</h2>
+<p>
+    Seguindo a diretriz inegociável de <strong>custo zero</strong>, <strong>ausência de cartão de crédito</strong> e <strong>respeito às políticas de acesso</strong>, foi realizada a verificação técnica em setembro de 2026:
+</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>Tecnologia</th>
+            <th>Funcionamento</th>
+            <th>Custo</th>
+            <th>Cota Gratuita</th>
+            <th>Cartão?</th>
+            <th>Diagnóstico Oficial (2026)</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Tavily Search API</strong><br><span class="badge badge-success">Adotado (Web Aberta)</span></td>
+            <td>API REST moderna para pesquisa e extração estruturada de URLs de e-commerces</td>
+            <td><strong>R$ 0,00</strong></td>
+            <td><strong>1.000 consultas/mês</strong></td>
+            <td><span class="badge badge-success">Não Exige</span></td>
+            <td><strong>Ideal para Varejo:</strong> Retorna páginas reais de grandes redes (Magalu, Fast Shop, Casas Bahia, Carrefour, ML) sem bloqueios de WAF. 100% gratuita.</td>
+        </tr>
+        <tr>
+            <td><strong>Catálogos Diretos (VTEX)</strong><br><span class="badge badge-success">Adotado (Lojas Oficiais)</span></td>
+            <td>APIs públicas de catálogo de lojas oficiais (`/api/catalog_system/pub/products/search?ft=...`)</td>
+            <td><strong>R$ 0,00</strong></td>
+            <td>Sem cota fixa oficial</td>
+            <td><span class="badge badge-neutral">Não</span></td>
+            <td><strong>Oficial & Nativo:</strong> Testado e validado em terminal na Midea e Panasonic. Monitora se as fabricantes recolocam os modelos em suas lojas próprias.</td>
+        </tr>
+        <tr>
+            <td><strong>Google Custom Search</strong><br><span class="badge badge-danger">Descartado Oficialmente</span></td>
+            <td>API REST legada do Google Programmable Search</td>
+            <td>R$ 0,00</td>
+            <td>Encerrada para novos clientes</td>
+            <td>Bloqueada</td>
+            <td><strong>Inviável:</strong> Confirmado na documentação oficial que o Google <strong>fechou novas contas</strong> (erro 403) e desligará a API em 01/01/2027.</td>
+        </tr>
+        <tr>
+            <td><strong>Brave Search API</strong><br><span class="badge badge-danger">Descartado</span></td>
+            <td>API de busca independente</td>
+            <td>Crédito $5</td>
+            <td>Exige cartão de crédito</td>
+            <td>Exige</td>
+            <td>Descartado porque desde fevereiro de 2026 passou a <strong>exigir cartão de crédito internacional obrigatório</strong> no cadastro.</td>
+        </tr>
+        <tr>
+            <td><strong>APIs Internas de Varejistas</strong><br><span class="badge badge-danger">Inviável</span></td>
+            <td>Chamadas diretas a APIs internas de Magalu, Casas Bahia, ML</td>
+            <td>R$ 0,00</td>
+            <td>Bloqueadas</td>
+            <td>Não</td>
+            <td>Testado em terminal: retornam <strong>HTTP 403 Forbidden / WAF</strong> para chamadas anônimas. Por isso a busca aberta via Tavily é indispensável.</td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="callout callout-info">
+    <strong>Estratégia de Custo Zero para o Profiler:</strong>
+    <br>O <code>ProductEnrichmentService</code> consome apenas 1 consulta leve do Tavily para obter o título comercial canônico e modelo, utilizando regex e dicionários em memória no PHP 8.5. Custo financeiro: <strong>R$ 0,00</strong>.
+</div>
+
+<div class="page-break"></div>
+
+<!-- PÁGINA 5: VALIDATOR UNIVERSAL & MATRIZ DE SCORE -->
+<h2 class="section-title">5. CandidateValidator Universal e Matriz de Confiança</h2>
+<p>
+    O validador é <strong>100% agnóstico ao tipo de produto</strong>. Ele não contém regras de lavadora, TV ou notebook embutidas no código PHP; ele apenas consome o perfil gerado para o produto.
+</p>
+
+<h3>Matriz de Pontuação e Confiança (Confidence Score)</h3>
+<table>
+    <thead>
+        <tr>
+            <th>Critério Avaliado</th>
+            <th>Peso com Modelo</th>
+            <th>Peso sem Modelo</th>
+            <th>Comportamento se Incompatível</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Hard Constraints (Exigências do Usuário)</strong></td>
+            <td><strong>+35 pts</strong></td>
+            <td><strong>+60 pts</strong></td>
+            <td><span class="badge badge-danger">ELIMINAÇÃO IMEDIATA</span> se violar qualquer exigência expressa do usuário.</td>
+        </tr>
+        <tr>
+            <td><strong>Termos Proibidos (forbidden_terms)</strong></td>
+            <td>Filtro Rígido</td>
+            <td>Filtro Rígido</td>
+            <td><span class="badge badge-danger">ELIMINAÇÃO IMEDIATA</span> se encontrar termos proibidos ou de peças/acessórios.</td>
+        </tr>
+        <tr>
+            <td><strong>Código de Modelo / SKU Dominante</strong></td>
+            <td><strong>+40 pts</strong></td>
+            <td><em>Não exigido</em></td>
+            <td>Se ativado modo estrito e não encontrar, rejeita. Se flexível, apenas pontua.</td>
+        </tr>
+        <tr>
+            <td><strong>Marca Confirmada no Título/Página</strong></td>
+            <td><strong>+15 pts</strong></td>
+            <td><strong>+25 pts</strong></td>
+            <td>Penaliza score se o anúncio for de marca paralela.</td>
+        </tr>
+        <tr>
+            <td><strong>Estrutura de Produto Válida (Canônica)</strong></td>
+            <td><strong>+10 pts</strong></td>
+            <td><strong>+15 pts</strong></td>
+            <td>Garante que o link é de compra de produto e não de categoria/busca.</td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="callout callout-warning">
+    <strong>Classificação e Roteamento dos Candidatos:</strong>
+    <br>• <strong>Score &ge; 85% (Alta Confiança):</strong> Produto e especificações 100% seguros. Aprovado automaticamente e adicionado ao monitoramento.
+    <br>• <strong>Score 60% a 84% (Média Confiança):</strong> Pequenas ambiguidades cosméticas. Enviado para <strong>Fontes Pendentes</strong> no Filament para aprovação em 1 clique.
+    <br>• <strong>Score &lt; 60% (Baixa Confiança / Rejeitado):</strong> Descartado com registro do motivo técnico para auditoria.
+</div>
+
+<h2 class="section-title">6. Proteção Contra Preços Falsos (Outlier & Sanity Check)</h2>
+<p>
+    Para evitar alertas indevidos por erros de scrape ou promoções fraudulentas:
+</p>
+<ul>
+    <li><strong>Variação Anormal:</strong> Se o preço coletado for <strong>inferior a 40%</strong> da meta ou do menor preço histórico;</li>
+    <li><strong>Supressão Preventiva:</strong> O WhatsApp <strong>não</strong> é disparado de imediato;</li>
+    <li><strong>Marcação de Auditoria:</strong> Observação gravada com <code>is_suspicious = true</code> e motivo <code>PRICE_OUTLIER_DETECTED</code>;</li>
+    <li><strong>Segunda Coleta de Confirmação:</strong> Rechecagem automática em 15 minutos para validar se o preço persiste antes de notificar.</li>
+</ul>
+
+<div class="page-break"></div>
+
+<!-- PÁGINA 6: SCHEMAS & FILAMENT UX -->
+<h2 class="section-title">7. Schemas de Banco de Dados e Migrations Incrementais</h2>
+<p>
+    Toda a estrutura atual é mantida intacta, adicionando tabelas e colunas incrementais:
+</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>Migration</th>
+            <th>Finalidade</th>
+            <th>Estrutura Criada</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>create_discovery_candidates_table</code></td>
+            <td>Ofertas brutas encontradas na web</td>
+            <td>`product_id`, `store_id`, `url`, `url_hash` (único para deduplicação), `raw_title`, `detected_model`, `detected_price`, `seller`, `confidence_score`, `scoring_breakdown`, `status`, `rejection_reason`.</td>
+        </tr>
+        <tr>
+            <td><code>create_discovery_runs_table</code></td>
+            <td>Auditoria de execuções de discovery</td>
+            <td>`product_id`, `provider`, `status`, `queries_executed`, `candidates_found`, `candidates_auto_approved`, `candidates_pending`, `candidates_rejected`, `duration_ms`.</td>
+        </tr>
+        <tr>
+            <td><code>update_products_table_add_profiling_and_rules</code></td>
+            <td>Dados do profiling e regras do produto</td>
+            <td>`commercial_name`, `hard_constraints` (JSON), `inferred_attributes` (JSON), `required_terms` (JSON), `forbidden_terms` (JSON), `strict_model` (boolean default false).</td>
+        </tr>
+        <tr>
+            <td><code>update_product_sources_table_add_lifecycle</code></td>
+            <td>Ciclo de vida das fontes</td>
+            <td>`status` (`active`, `out_of_stock`, `temporarily_unavailable`, `removed`, `blocked`), `last_checked_at`, `discovery_candidate_id`.</td>
+        </tr>
+        <tr>
+            <td><code>update_price_observations_add_sanity</code></td>
+            <td>Trava contra outliers de preço</td>
+            <td>`is_suspicious` (boolean), `sanity_check_reason` (string nullable).</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 class="section-title">8. Experiência de Uso no Filament V2 (UX Humana)</h2>
+<ol>
+    <li><strong>Cadastro em Linguagem Natural:</strong>
+        <br>O usuário preenche apenas o campo principal: <code>LG OLED C6 55 polegadas</code> (ou <code>Midea MA512W165 16,5 kg 220V</code>) e o preço-alvo desejado.
+    </li>
+    <li><strong>Modal de Confirmação Rápida (Profiling):</strong>
+        <br>O robô analisa em 1 segundo e exibe:
+        <br><em>"Produto identificado: Smart TV LG 55" OLED Série C6 (Modelo: OLED55C6P | 4K 120Hz). Restrições fixadas: 55 polegadas, Painel OLED."</em>
+        <br>Botão principal: <code>[ ✓ Confirmar e Iniciar Descoberta de Ofertas ]</code>.
+    </li>
+    <li><strong>Modo Avançado (Opcional):</strong>
+        <br>Accordion colapsado que exibe as tags auto-preenchidas de `required_terms`, `forbidden_terms` e o toggle `strict_model`, caso o usuário queira auditar ou ajustar.
+    </li>
+    <li><strong>Gestão de Fontes Pendentes:</strong>
+        <br>Tela dedicada a ofertas com pontuação intermediária (60%–84%) com botões de ação imediata:
+        <br><code>[✓ Aprovar e Monitorar]</code> &nbsp; <code>[✕ Rejeitar Oferta]</code> &nbsp; <code>[↗ Abrir na Loja]</code>.
+    </li>
+    <li><strong>Ação Manual: "Buscar Ofertas Agora":</strong>
+        <br>Disponível na lista de Produtos para rodar a qualquer momento com relatório resumido de varredura.
+    </li>
+</ol>
+
+<div class="page-break"></div>
+
+<!-- PÁGINA 7: AUTOMAÇÃO, VPS E PLANO DE EXECUÇÃO -->
+<h2 class="section-title">9. Automação, Agendamento e Infraestrutura</h2>
+<ul>
+    <li><strong>Coleta Diária de Preços:</strong> Executa diariamente às <strong>08:00</strong> (`Schedule::command('pricewatch:collect')`), verificando preços e estoques das fontes ativas.</li>
+    <li><strong>Descoberta Periódica de Novas Lojas:</strong> Executa <strong>2 vezes por semana</strong> (terças e sextas às <strong>09:00</strong> via `Schedule::command('pricewatch:discover')`).</li>
+    <li><strong>Impacto na VPS:</strong> Adição de menos de <strong>30 MB de RAM</strong>. Utiliza cURL nativo em PHP 8.5. Não roda navegadores headless pesados.</li>
+    <li><strong>Preservação Integral de Serviços:</strong> GoWA, Evolution API, Traefik, Coolify e redes Docker permanecem 100% operantes sem qualquer interrupção.</li>
+</ul>
+
+<h2 class="section-title">10. Plano Incremental de Implementação</h2>
+
+<table>
+    <thead>
+        <tr>
+            <th>Fase</th>
+            <th>Escopo de Entrega</th>
+            <th>Entregáveis Técnicos</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Fase 1</strong><br>Schema & Models</td>
+            <td>Tabelas para candidatos, execuções e regras flexíveis.</td>
+            <td>4 Migrations incrementais; Models `DiscoveryCandidate` e `DiscoveryRun`; novos campos e casts JSON no model `Product`.</td>
+        </tr>
+        <tr>
+            <td><strong>Fase 2</strong><br>Product Profiler</td>
+            <td>Camada de interpretação e normalização de produtos.</td>
+            <td>`ProductEnrichmentService` com parser de linguagem natural, extração de Hard Constraints, inferência de atributos e gerador de termos de proteção.</td>
+        </tr>
+        <tr>
+            <td><strong>Fase 3</strong><br>Motor Discovery</td>
+            <td>Validador universal, gerador de queries e busca.</td>
+            <td>`GenericCandidateValidator` (agnóstico ao produto), `CandidateScorer`, `TavilyDiscoveryProvider`, `DirectStoreDiscoveryProvider`, `ProductDiscoveryService`.</td>
+        </tr>
+        <tr>
+            <td><strong>Fase 4</strong><br>Proteção de Preços</td>
+            <td>Sanity checks contra outliers.</td>
+            <td>Atualização do `AlertEvaluator` com trava de 40% de margem e fila de rechecagem.</td>
+        </tr>
+        <tr>
+            <td><strong>Fase 5</strong><br>Filament Admin V2</td>
+            <td>UX em linguagem natural e gestão de candidatos.</td>
+            <td>Modal de profiling pós-digitação, accordion avançado, aba de Fontes Pendentes, ação "Buscar Ofertas Agora" no `ProductResource`.</td>
+        </tr>
+        <tr>
+            <td><strong>Fase 6</strong><br>Scheduler & Deploy</td>
+            <td>Automação, testes e validação em produção.</td>
+            <td>Comando `pricewatch:discover`, agendamento 2x/semana, testes automatizados PHPUnit, deploy zero-downtime na VPS e atualização da documentação técnica.</td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="callout callout-info" style="margin-top: 12px;">
+    <strong>Garantias do Projeto:</strong>
+    <br>• Custo adicional de serviços externos: <strong>R$ 0,00</strong>.
+    <br>• Cartão de crédito exigido: <strong>Nenhum</strong>.
+    <br>• Facilidade de uso: <strong>Digitação livre em linguagem natural</strong>.
+    <br>• Integridade de GoWA e Evolution API: <strong>Preservada</strong>.
+</div>
+
+</body>
+</html>

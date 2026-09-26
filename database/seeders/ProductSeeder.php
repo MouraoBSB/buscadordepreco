@@ -64,6 +64,7 @@ class ProductSeeder extends Seeder
         $products = [
             [
                 'name' => 'Lavadora de Roupas Midea 16,5 kg Cinza Escuro Top Load',
+                'commercial_name' => 'Midea Top Load 16,5kg Titanium',
                 'brand' => 'Midea',
                 'image_url' => '/images/products/midea-ma512w165.jpg',
                 'model_code' => 'MA512W165/GK-05',
@@ -71,6 +72,19 @@ class ProductSeeder extends Seeder
                 'voltage' => '220V',
                 'target_price' => 2200.00,
                 'active' => true,
+                'hard_constraints' => [
+                    'voltage' => '220V',
+                    'capacity_kg' => 16.5,
+                    'has_agitator' => false,
+                ],
+                'inferred_attributes' => [
+                    'color' => 'Titanium / Cinza Escuro',
+                    'drum' => 'Inox',
+                    'type' => 'Top Load',
+                ],
+                'required_terms' => ['220V'],
+                'forbidden_terms' => ['110V', '127V', 'agitador', 'com agitador', 'peça', 'placa', 'válvula', 'mangueira', 'usado'],
+                'strict_model' => false,
                 'metadata' => [
                     'type' => 'top-load',
                     'agitator' => false,
@@ -85,6 +99,7 @@ class ProductSeeder extends Seeder
             ],
             [
                 'name' => 'Lavadora de Roupas Panasonic 18 kg Titânio Top Load',
+                'commercial_name' => 'Panasonic Titânio 18kg Top Load',
                 'brand' => 'Panasonic',
                 'image_url' => '/images/products/panasonic-na-f180p7.jpg',
                 'model_code' => 'NA-F180P7',
@@ -92,6 +107,19 @@ class ProductSeeder extends Seeder
                 'voltage' => '220V',
                 'target_price' => 2500.00,
                 'active' => true,
+                'hard_constraints' => [
+                    'voltage' => '220V',
+                    'capacity_kg' => 18.0,
+                    'has_agitator' => false,
+                ],
+                'inferred_attributes' => [
+                    'color' => 'Titânio',
+                    'drum' => 'Inox',
+                    'type' => 'Top Load',
+                ],
+                'required_terms' => ['220V'],
+                'forbidden_terms' => ['110V', '127V', 'agitador', 'com agitador', 'peça', 'placa', 'válvula', 'mangueira', 'usado'],
+                'strict_model' => false,
                 'metadata' => [
                     'type' => 'top-load',
                     'agitator' => false,
@@ -106,6 +134,7 @@ class ProductSeeder extends Seeder
             ],
             [
                 'name' => 'Lavadora de Roupas Samsung 17 kg Ecobubble Top Load',
+                'commercial_name' => 'Samsung Ecobubble 17kg Black Caviar',
                 'brand' => 'Samsung',
                 'image_url' => '/images/products/samsung-wa17cg6746.jpg',
                 'model_code' => 'WA17CG6746BVBZ',
@@ -113,6 +142,20 @@ class ProductSeeder extends Seeder
                 'voltage' => '220V',
                 'target_price' => 3000.00,
                 'active' => true,
+                'hard_constraints' => [
+                    'voltage' => '220V',
+                    'capacity_kg' => 17.0,
+                    'has_agitator' => false,
+                ],
+                'inferred_attributes' => [
+                    'color' => 'Black Caviar',
+                    'technology' => 'Ecobubble',
+                    'drum' => 'Inox',
+                    'type' => 'Top Load',
+                ],
+                'required_terms' => ['220V'],
+                'forbidden_terms' => ['110V', '127V', 'agitador', 'com agitador', 'peça', 'placa', 'válvula', 'mangueira', 'usado'],
+                'strict_model' => false,
                 'metadata' => [
                     'type' => 'top-load',
                     'agitator' => false,

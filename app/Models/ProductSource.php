@@ -20,12 +20,16 @@ class ProductSource extends Model
         'expected_model',
         'expected_voltage',
         'active',
+        'status',
         'priority',
+        'last_checked_at',
+        'discovery_candidate_id',
     ];
 
     protected $casts = [
         'active' => 'boolean',
         'priority' => 'integer',
+        'last_checked_at' => 'datetime',
     ];
 
     public function product(): BelongsTo
@@ -36,6 +40,11 @@ class ProductSource extends Model
     public function store(): BelongsTo
     {
         return $this->belongsTo(Store::class);
+    }
+
+    public function discoveryCandidate(): BelongsTo
+    {
+        return $this->belongsTo(DiscoveryCandidate::class);
     }
 
     public function observations(): HasMany

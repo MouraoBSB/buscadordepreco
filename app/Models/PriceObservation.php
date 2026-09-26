@@ -23,6 +23,8 @@ class PriceObservation extends Model
         'raw_title',
         'is_mismatch',
         'mismatch_reason',
+        'is_suspicious',
+        'sanity_check_reason',
         'collected_at',
         'metadata',
     ];
@@ -35,6 +37,7 @@ class PriceObservation extends Model
         'installment_count' => 'integer',
         'in_stock' => 'boolean',
         'is_mismatch' => 'boolean',
+        'is_suspicious' => 'boolean',
         'collected_at' => 'datetime',
         'metadata' => 'array',
     ];

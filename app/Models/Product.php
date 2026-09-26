@@ -12,6 +12,7 @@ class Product extends Model
 
     protected $fillable = [
         'name',
+        'commercial_name',
         'brand',
         'image_url',
         'model_code',
@@ -20,6 +21,11 @@ class Product extends Model
         'target_price',
         'active',
         'metadata',
+        'hard_constraints',
+        'inferred_attributes',
+        'required_terms',
+        'forbidden_terms',
+        'strict_model',
     ];
 
     protected $casts = [
@@ -27,6 +33,11 @@ class Product extends Model
         'target_price' => 'decimal:2',
         'active' => 'boolean',
         'metadata' => 'array',
+        'hard_constraints' => 'array',
+        'inferred_attributes' => 'array',
+        'required_terms' => 'array',
+        'forbidden_terms' => 'array',
+        'strict_model' => 'boolean',
     ];
 
     public function getImageUrlAttribute(?string $value): ?string
@@ -45,6 +56,16 @@ class Product extends Model
     public function sources(): HasMany
     {
         return $this->hasMany(ProductSource::class);
+    }
+
+    public function discoveryCandidates(): HasMany
+    {
+        return $this->hasMany(DiscoveryCandidate::class);
+    }
+
+    public function discoveryRuns(): HasMany
+    {
+        return $this->hasMany(DiscoveryRun::class);
     }
 
     public function alertRules(): HasMany
