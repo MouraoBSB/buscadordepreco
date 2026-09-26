@@ -35,4 +35,11 @@ return [
         ],
     ],
 
+    'gowa' => [
+        'base_url' => env('GOWA_BASE_URL', 'http://178.156.245.190:3020'),
+        'user' => env('GOWA_USER', 'admin'),
+        'password' => env('GOWA_PASSWORD'),
+        'recipient_phone' => env('GOWA_RECIPIENT_PHONE'),
+    ],
+
 ];

@@ -17,10 +17,10 @@ class GoWaChannel
 
     public function __construct()
     {
-        $this->baseUrl = rtrim(config('services.gowa.base_url', env('GOWA_BASE_URL', 'http://localhost:3020')), '/');
-        $this->user = config('services.gowa.user', env('GOWA_USER'));
-        $this->password = config('services.gowa.password', env('GOWA_PASSWORD'));
-        $this->defaultRecipient = config('services.gowa.recipient_phone', env('GOWA_RECIPIENT_PHONE'));
+        $this->baseUrl = rtrim((string) config('services.gowa.base_url', 'http://178.156.245.190:3020'), '/');
+        $this->user = config('services.gowa.user', 'admin');
+        $this->password = config('services.gowa.password');
+        $this->defaultRecipient = config('services.gowa.recipient_phone');
     }
 
     /**
@@ -38,7 +38,7 @@ class GoWaChannel
         }
 
         // Clean phone number (remove +, spaces, hyphens)
-        $cleanPhone = preg_replace('/[^\d]/', '', $targetPhone);
+        $cleanPhone = preg_replace('/[^\d]/', '', (string) $targetPhone);
 
         try {
             $request = Http::timeout(10);
