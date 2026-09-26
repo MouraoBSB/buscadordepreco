@@ -16,6 +16,7 @@ class DiscoveryRun extends Model
         'trigger_type',
         'status',
         'queries_executed',
+        'provider_stats',
         'candidates_found',
         'candidates_auto_approved',
         'candidates_pending',
@@ -28,6 +29,7 @@ class DiscoveryRun extends Model
 
     protected $casts = [
         'queries_executed' => 'array',
+        'provider_stats' => 'array',
         'candidates_found' => 'integer',
         'candidates_auto_approved' => 'integer',
         'candidates_pending' => 'integer',

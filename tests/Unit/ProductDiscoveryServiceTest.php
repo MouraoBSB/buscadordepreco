@@ -92,4 +92,62 @@ class ProductDiscoveryServiceTest extends TestCase
         $this->assertTrue($source->active);
         $this->assertEquals('magazineluiza.com.br', $source->store->domain);
     }
+
+    public function test_multi_provider_deduplication_preserves_provenance_and_records_stats(): void
+    {
+        $product = Product::create([
+            'name' => 'Lavadora Midea 16,5 kg 220 V MA512W165/GK-05',
+            'commercial_name' => 'Lavadora 16,5 kg',
+            'brand' => 'Midea',
+            'model_code' => 'MA512W165/GK-05',
+            'voltage' => '220V',
+            'capacity_kg' => 16.5,
+            'target_price' => 2000.00,
+            'hard_constraints' => ['voltage' => '220V'],
+            'forbidden_terms' => ['110V', '127V'],
+        ]);
+
+        $sharedUrl = 'https://www.magazineluiza.com.br/lavadora-midea-165kg-ma512w165-220v/p/12345/';
+
+        $provider1 = (new MockDiscoveryProvider)->setMockCandidates([
+            new RawCandidateDto(
+                url: $sharedUrl,
+                title: 'Lavadora Midea 16,5kg MA512W165 220V',
+                snippet: 'Lavadora Midea 220V',
+                provider: 'direct_store'
+            ),
+        ]);
+
+        // Provider 2 finds the exact same URL
+        $provider2 = (new MockDiscoveryProvider)->setMockCandidates([
+            new RawCandidateDto(
+                url: $sharedUrl,
+                title: 'Lavadora Midea 16,5kg MA512W165 220V',
+                snippet: 'Lavadora Midea 220V',
+                provider: 'tavily'
+            ),
+        ]);
+
+        $validator = new CandidateValidator;
+        $scorer = new CandidateScorer;
+        $profiler = new ProductEnrichmentService;
+
+        $service = new ProductDiscoveryService($validator, $scorer, $profiler);
+        $service->setProviders([$provider1, $provider2]);
+
+        $result = $service->discoverForProduct($product, ['lavadora midea']);
+
+        // Assert exactly 1 candidate and 1 source
+        $this->assertEquals(1, DiscoveryCandidate::where('product_id', $product->id)->count());
+        $this->assertEquals(1, ProductSource::where('product_id', $product->id)->count());
+
+        $candidate = DiscoveryCandidate::where('product_id', $product->id)->first();
+
+        // Assert provenance preserved: metadata contains providers list
+        $this->assertIsArray($candidate->metadata['providers']);
+        $this->assertCount(2, $candidate->metadata['providers']);
+
+        // Assert provider_stats recorded in run
+        $this->assertArrayHasKey('mock', $result['provider_stats']);
+    }
 }

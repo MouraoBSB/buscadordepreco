@@ -73,9 +73,10 @@ class DiscoveryCandidatesTable
                     ->tooltip(fn (DiscoveryCandidate $record): ?string => $record->rejection_reason),
 
                 TextColumn::make('discovery_provider')
-                    ->label('Provedor')
+                    ->label('Provedor(es)')
                     ->badge()
-                    ->color('gray'),
+                    ->separator(', ')
+                    ->color('info'),
 
                 TextColumn::make('discovered_at')
                     ->label('Descoberto em')
