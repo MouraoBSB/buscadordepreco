@@ -42,4 +42,9 @@ return [
         'recipient_phone' => env('GOWA_RECIPIENT_PHONE'),
     ],
 
+    'tavily' => [
+        'key' => env('TAVILY_API_KEY'),
+        'monthly_limit' => (int) env('TAVILY_MONTHLY_LIMIT', 1000),
+    ],
+
 ];
