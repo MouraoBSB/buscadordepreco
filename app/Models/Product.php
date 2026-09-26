@@ -29,6 +29,19 @@ class Product extends Model
         'metadata' => 'array',
     ];
 
+    public function getImageUrlAttribute(?string $value): ?string
+    {
+        if (blank($value)) {
+            return null;
+        }
+
+        if (str_starts_with($value, 'http://') || str_starts_with($value, 'https://')) {
+            return $value;
+        }
+
+        return asset(ltrim($value, '/'));
+    }
+
     public function sources(): HasMany
     {
         return $this->hasMany(ProductSource::class);
