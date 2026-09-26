@@ -83,7 +83,7 @@ class ProductSeeder extends Seeder
                     'type' => 'Top Load',
                 ],
                 'required_terms' => ['220V'],
-                'forbidden_terms' => ['110V', '127V', 'com agitador', 'agitador central', 'peça', 'placa', 'válvula', 'mangueira', 'usado'],
+                'forbidden_terms' => ['110V', '127V', 'com agitador', 'peça', 'placa', 'válvula', 'mangueira', 'usado'],
                 'strict_model' => false,
                 'metadata' => [
                     'type' => 'top-load',
@@ -118,7 +118,7 @@ class ProductSeeder extends Seeder
                     'type' => 'Top Load',
                 ],
                 'required_terms' => ['220V'],
-                'forbidden_terms' => ['110V', '127V', 'com agitador', 'agitador central', 'peça', 'placa', 'válvula', 'mangueira', 'usado'],
+                'forbidden_terms' => ['110V', '127V', 'com agitador', 'peça', 'placa', 'válvula', 'mangueira', 'usado'],
                 'strict_model' => false,
                 'metadata' => [
                     'type' => 'top-load',
@@ -154,7 +154,7 @@ class ProductSeeder extends Seeder
                     'type' => 'Top Load',
                 ],
                 'required_terms' => ['220V'],
-                'forbidden_terms' => ['110V', '127V', 'com agitador', 'agitador central', 'peça', 'placa', 'válvula', 'mangueira', 'usado'],
+                'forbidden_terms' => ['110V', '127V', 'com agitador', 'peça', 'placa', 'válvula', 'mangueira', 'usado'],
                 'strict_model' => false,
                 'metadata' => [
                     'type' => 'top-load',

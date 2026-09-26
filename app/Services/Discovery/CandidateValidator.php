@@ -46,10 +46,15 @@ class CandidateValidator
 
         // Check Agitator
         if (isset($hardConstraints['has_agitator']) && $hardConstraints['has_agitator'] === false) {
-            if (preg_match('/\b(com\s*agitador|agitador\s*central)\b/i', $text)) {
+            $isExplicitlyWithout = (bool) preg_match('/(sem\s*agitador|dispensa\s*agitador)/i', $text);
+            $hasAgitatorMention = (bool) preg_match('/(com\s*agitador|agitador\s*central)/i', $text);
+
+            if ($hasAgitatorMention && ! $isExplicitlyWithout) {
                 return CandidateValidationResult::reject('Incompatível: modelo possui agitador central, produto exige sem agitador.');
             }
-            $matches['no_agitator_confirmed'] = true;
+            if ($isExplicitlyWithout) {
+                $matches['no_agitator_confirmed'] = true;
+            }
         }
 
         // Check Screen Size (if specified)

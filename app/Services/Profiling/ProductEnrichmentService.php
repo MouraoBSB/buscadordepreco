@@ -274,7 +274,6 @@ class ProductEnrichmentService
         // 2. Agitator contradiction
         if (isset($hardConstraints['has_agitator']) && $hardConstraints['has_agitator'] === false) {
             $forbidden[] = 'com agitador';
-            $forbidden[] = 'agitador central';
         }
 
         // 3. Screen size contradictions (if TV)
