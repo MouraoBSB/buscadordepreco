@@ -133,7 +133,7 @@ class ProductDiscoveryService
                 }
 
                 foreach ($rawCandidates as $rawCandidate) {
-                    $urlHash = $rawCandidate->urlHash;
+                    $urlHash = $rawCandidate->getUrlHash();
 
                     // Deduplication without losing provenance (User Adjustment #1)
                     if (isset($seenHashes[$urlHash])) {

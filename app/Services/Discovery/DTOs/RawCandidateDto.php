@@ -17,6 +17,18 @@ class RawCandidateDto
         public array $rawPayload = []
     ) {}
 
+    public function __get(string $name): mixed
+    {
+        if ($name === 'urlHash') {
+            return $this->getUrlHash();
+        }
+        if ($name === 'domain') {
+            return $this->getDomain();
+        }
+
+        return null;
+    }
+
     public function getUrlHash(): string
     {
         // Normalize URL for deduplication: remove trailing slash and common tracking parameters
