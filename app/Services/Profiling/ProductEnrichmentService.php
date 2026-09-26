@@ -290,7 +290,7 @@ class ProductEnrichmentService
 
         // 4. Parts / Accessories context check
         // Check if user INTENTIONALLY asked for parts or accessories
-        $isSearchingParts = preg_match('/\b(peça|peças|placa|placas|suporte|capa|filtro|acessório|válvula|mangueira)\b/i', $inputLower);
+        $isSearchingParts = preg_match('/\b(peça|peças|placa|placas|suporte|capa|filtro|acessório|válvula|mangueira|trava|correia|bomba)\b/i', $inputLower);
         if (! $isSearchingParts) {
             // User wants a complete product, so forbid spare parts/accessories
             $forbidden[] = 'peça';
@@ -300,6 +300,10 @@ class ProductEnrichmentService
             $forbidden[] = 'filtro de reposição';
             $forbidden[] = 'válvula';
             $forbidden[] = 'mangueira';
+            $forbidden[] = 'trava da porta';
+            $forbidden[] = 'trava';
+            $forbidden[] = 'bomba de drenagem';
+            $forbidden[] = 'correia';
         }
 
         // 5. Used / Refurbished context check
