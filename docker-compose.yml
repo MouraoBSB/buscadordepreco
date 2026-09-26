@@ -23,6 +23,7 @@ services:
       - pricewatch_net
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=coolify"
       - "traefik.http.routers.pricewatch-http.entryPoints=http"
       - "traefik.http.routers.pricewatch-http.middlewares=redirect-to-https"
       - "traefik.http.routers.pricewatch-http.rule=Host(`buscador.mgnexus.com.br`)"
