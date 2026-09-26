@@ -16,7 +16,9 @@ Schedule::command('pricewatch:collect')
 
 // Schedule discovery twice a week (Tuesday & Friday at 09:00) to find new deals and stores
 Schedule::command('pricewatch:discover')
-    ->twiceWeekly(2, 5, '09:00')
+    ->days([2, 5])
+    ->at('09:00')
     ->withoutOverlapping()
     ->runInBackground();
+
 
