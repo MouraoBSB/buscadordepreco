@@ -106,7 +106,8 @@ class ProductForm
                                 '127V' => '127V',
                                 'Bivolt' => 'Bivolt',
                             ])
-                            ->default('220V'),
+                            ->nullable()
+                            ->default('Bivolt'),
 
                         TextInput::make('target_price')
                             ->label('Preço Alvo (R$)')

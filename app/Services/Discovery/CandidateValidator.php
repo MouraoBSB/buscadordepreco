@@ -15,6 +15,12 @@ class CandidateValidator
         $text = mb_strtolower($candidate->title.' '.($candidate->snippet ?? ''), 'UTF-8');
         $matches = [];
 
+        // 0. Filter out Search and Category listing URLs (Amazon /s?, Casas Bahia /b, Magalu /busca)
+        $urlLower = strtolower($candidate->url);
+        if (preg_match('/(\/s\?|\/s\/|\/busca|\/search|\/categoria|\/departamento|\/lista|\/c\/|\/ofertas|\/b$|\/b\/)/', $urlLower)) {
+            return CandidateValidationResult::reject('URL é página de busca ou listagem de categoria, não anúncio individual de produto.');
+        }
+
         // 1. Forbidden Terms Check (contextual protection from Product Profiling)
         $forbiddenTerms = $product->forbidden_terms ?? [];
         foreach ($forbiddenTerms as $term) {
