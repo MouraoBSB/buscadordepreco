@@ -40,6 +40,17 @@ class Product extends Model
         'strict_model' => 'boolean',
     ];
 
+    protected static function booted(): void
+    {
+        static::created(function (Product $product) {
+            if (blank($product->getRawOriginal('image_url'))) {
+                dispatch(function () use ($product) {
+                    app(\App\Services\Product\ProductImageService::class)->fetchAndAssignImage($product);
+                })->afterResponse();
+            }
+        });
+    }
+
     public function getImageUrlAttribute(?string $value): ?string
     {
         if (blank($value)) {

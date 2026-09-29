@@ -58,6 +58,16 @@ class ProductForm
                                         $set('hard_constraints', $profile->hardConstraints);
                                         $set('inferred_attributes', $profile->inferredAttributes);
 
+                                        // Auto-fetch image if empty
+                                        if (empty($get('image_url'))) {
+                                            $imageService = app(\App\Services\Product\ProductImageService::class);
+                                            $imageQuery = trim(($profile->brand ? $profile->brand . ' ' : '') . ($profile->commercialName ?: $profile->name));
+                                            $foundImage = $imageService->searchProductImage($imageQuery);
+                                            if ($foundImage) {
+                                                $set('image_url', $foundImage);
+                                            }
+                                        }
+
                                         $brandInfo = $profile->brand ? "Marca: {$profile->brand}" : 'Marca genérica';
                                         $modelInfo = $profile->modelCode ? "Modelo: {$profile->modelCode}" : 'Sem código estrito';
 
@@ -92,8 +102,45 @@ class ProductForm
 
                         TextInput::make('image_url')
                             ->label('Caminho ou URL da Foto do Produto')
-                            ->placeholder('ex: /images/products/midea-ma512w165.jpg')
-                            ->maxLength(500),
+                            ->placeholder('ex: https://... ou /images/products/...')
+                            ->maxLength(500)
+                            ->suffixAction(
+                                Action::make('searchImage')
+                                    ->label('Buscar Foto Online')
+                                    ->icon('heroicon-m-photo')
+                                    ->color('info')
+                                    ->action(function (Get $get, Set $set) {
+                                        $name = $get('name') ?: $get('commercial_name') ?: $get('natural_input');
+                                        if (empty($name)) {
+                                            Notification::make()
+                                                ->title('Informe o nome do produto primeiro')
+                                                ->warning()
+                                                ->send();
+                                            return;
+                                        }
+
+                                        $brand = $get('brand');
+                                        $query = trim(($brand ? $brand . ' ' : '') . $name);
+
+                                        $service = app(\App\Services\Product\ProductImageService::class);
+                                        $img = $service->searchProductImage($query);
+
+                                        if ($img) {
+                                            $set('image_url', $img);
+                                            Notification::make()
+                                                ->title('Foto encontrada com sucesso!')
+                                                ->body('Imagem oficial selecionada e preenchida.')
+                                                ->success()
+                                                ->send();
+                                        } else {
+                                            Notification::make()
+                                                ->title('Nenhuma imagem encontrada')
+                                                ->body('Não foi possível localizar uma foto automaticamente.')
+                                                ->warning()
+                                                ->send();
+                                        }
+                                    })
+                            ),
 
                         TextInput::make('capacity_kg')
                             ->label('Capacidade (kg)')

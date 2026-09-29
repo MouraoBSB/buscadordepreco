@@ -57,6 +57,7 @@ class TavilyDiscoveryProvider implements DiscoveryProviderInterface
                         'api_key' => $apiKey,
                         'query' => $searchQuery,
                         'search_depth' => 'basic',
+                        'include_images' => true,
                         'max_results' => 8,
                         'include_domains' => [
                             'magazineluiza.com.br',
@@ -77,6 +78,15 @@ class TavilyDiscoveryProvider implements DiscoveryProviderInterface
                 $durationMs = (int) round((microtime(true) - $startTime) * 1000);
                 $status = $response->status();
                 $results = $response->successful() ? $response->json('results', []) : [];
+
+                // If product currently lacks a photo, auto-enrich it from discovery images
+                if (blank($product->getRawOriginal('image_url')) && ! empty($response->json('images'))) {
+                    $images = $response->json('images');
+                    $firstImg = is_string($images[0]) ? $images[0] : ($images[0]['url'] ?? null);
+                    if ($firstImg) {
+                        $product->update(['image_url' => $firstImg]);
+                    }
+                }
 
                 // Audit usage log
                 ApiUsageLog::logRequest(
