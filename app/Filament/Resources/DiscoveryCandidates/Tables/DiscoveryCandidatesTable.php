@@ -34,8 +34,12 @@ class DiscoveryCandidatesTable
                 TextColumn::make('raw_title')
                     ->label('Título do Anúncio')
                     ->searchable()
-                    ->limit(50)
-                    ->tooltip(fn (DiscoveryCandidate $record): string => $record->raw_title ?? ''),
+                    ->url(fn (DiscoveryCandidate $record): string => $record->url)
+                    ->openUrlInNewTab()
+                    ->color('primary')
+                    ->weight('medium')
+                    ->limit(55)
+                    ->tooltip(fn (DiscoveryCandidate $record): string => ($record->raw_title ?? '') . ' (Clique para abrir na loja)'),
 
                 TextColumn::make('confidence_score')
                     ->label('Score')
@@ -69,7 +73,7 @@ class DiscoveryCandidatesTable
                 TextColumn::make('rejection_reason')
                     ->label('Motivo / Incompatibilidade')
                     ->placeholder('—')
-                    ->limit(40)
+                    ->limit(35)
                     ->tooltip(fn (DiscoveryCandidate $record): ?string => $record->rejection_reason),
 
                 TextColumn::make('discovery_provider')
@@ -84,15 +88,32 @@ class DiscoveryCandidatesTable
                     ->sortable(),
             ])
             ->defaultSort('discovered_at', 'desc')
+            ->filters([
+                \Filament\Tables\Filters\SelectFilter::make('product_id')
+                    ->label('Filtrar por Produto')
+                    ->options(fn () => \App\Models\Product::all()->mapWithKeys(fn ($p) => [$p->id => ($p->brand ? $p->brand . ' - ' : '') . ($p->commercial_name ?: $p->name)])->toArray())
+                    ->searchable()
+                    ->preload(),
+
+                \Filament\Tables\Filters\SelectFilter::make('status')
+                    ->label('Status')
+                    ->options([
+                        'auto_approved' => 'Auto Aprovado',
+                        'approved' => 'Aprovado',
+                        'pending_review' => 'Pendente',
+                        'rejected' => 'Rejeitado',
+                    ]),
+
+                \Filament\Tables\Filters\SelectFilter::make('discovered_store_name')
+                    ->label('Filtrar por Loja')
+                    ->options(fn () => \App\Models\DiscoveryCandidate::whereNotNull('discovered_store_name')->distinct()->pluck('discovered_store_name', 'discovered_store_name')->toArray()),
+            ])
             ->recordActions([
                 Action::make('approve')
                     ->label('Aprovar e Monitorar')
                     ->icon('heroicon-o-check-circle')
                     ->color('success')
                     ->visible(fn (DiscoveryCandidate $record): bool => in_array($record->status, ['pending_review', 'rejected'], true))
-                    ->requiresConfirmation()
-                    ->modalHeading('Aprovar Oferta para Monitoramento')
-                    ->modalDescription('Esta oferta será convertida em uma Fonte de Coleta ativa e terá seu preço monitorado diariamente.')
                     ->action(function (DiscoveryCandidate $record) {
                         // Find or create store
                         $domain = $record->discovered_store_domain;
@@ -134,9 +155,18 @@ class DiscoveryCandidatesTable
                             'rejection_reason' => null,
                         ]);
 
+                        // Run immediate collection on this new source in background
+                        dispatch(function () use ($source) {
+                            try {
+                                app(\App\Services\Collector\Pipeline\CollectionPipeline::class)->run($source);
+                            } catch (\Throwable $e) {
+                                \Illuminate\Support\Facades\Log::warning("Collection on approve failed for source {$source->id}: {$e->getMessage()}");
+                            }
+                        })->afterResponse();
+
                         Notification::make()
                             ->title('Oferta aprovada com sucesso!')
-                            ->body('A URL foi adicionada às fontes ativas de monitoramento.')
+                            ->body('Fonte adicionada e coleta inicial disparada.')
                             ->success()
                             ->send();
                     }),
@@ -146,9 +176,6 @@ class DiscoveryCandidatesTable
                     ->icon('heroicon-o-x-circle')
                     ->color('danger')
                     ->visible(fn (DiscoveryCandidate $record): bool => in_array($record->status, ['pending_review', 'auto_approved', 'approved'], true))
-                    ->requiresConfirmation()
-                    ->modalHeading('Rejeitar Oferta')
-                    ->modalDescription('Esta oferta não será monitorada. Se já houver fonte vinculada, ela será desativada.')
                     ->action(function (DiscoveryCandidate $record) {
                         if ($record->product_source_id) {
                             ProductSource::where('id', $record->product_source_id)->update(['active' => false, 'status' => 'inactive']);
@@ -165,13 +192,6 @@ class DiscoveryCandidatesTable
                             ->warning()
                             ->send();
                     }),
-
-                Action::make('open_url')
-                    ->label('Abrir na Loja')
-                    ->icon('heroicon-o-arrow-top-right-on-square')
-                    ->color('gray')
-                    ->url(fn (DiscoveryCandidate $record): string => $record->url)
-                    ->openUrlInNewTab(),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([

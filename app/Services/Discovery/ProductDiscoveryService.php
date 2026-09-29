@@ -271,6 +271,17 @@ class ProductDiscoveryService
                         $candidateModel->update([
                             'product_source_id' => $source->id,
                         ]);
+
+                        // Automatically trigger initial price collection for new auto-approved source
+                        if ($source->wasRecentlyCreated) {
+                            dispatch(function () use ($source) {
+                                try {
+                                    app(\App\Services\Collector\Pipeline\CollectionPipeline::class)->run($source);
+                                } catch (\Throwable $e) {
+                                    \Illuminate\Support\Facades\Log::warning("Immediate collection failed for auto-approved source {$source->id}: {$e->getMessage()}");
+                                }
+                            })->afterResponse();
+                        }
                     } elseif ($scoring['status'] === 'pending_review') {
                         $candidatesPending++;
                     } else {
