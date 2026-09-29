@@ -13,9 +13,9 @@
                     <div>
                         <div class="flex items-start gap-4">
                             @if ($product['image_url'])
-                                <img src="{{ $product['image_url'] }}" alt="{{ $product['name'] }}" class="w-16 h-16 object-contain rounded-lg border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 p-1 flex-shrink-0" />
+                                <img src="{{ $product['image_url'] }}" alt="{{ $product['name'] }}" style="width: 64px; height: 64px; min-width: 64px; max-width: 64px; object-fit: contain;" class="rounded-lg border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 p-1 flex-shrink-0" />
                             @else
-                                <div class="w-16 h-16 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-shrink-0 text-gray-400">
+                                <div style="width: 64px; height: 64px; min-width: 64px; max-width: 64px;" class="rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-shrink-0 text-gray-400">
                                     <x-filament::icon icon="heroicon-m-photo" class="h-8 w-8" />
                                 </div>
                             @endif
