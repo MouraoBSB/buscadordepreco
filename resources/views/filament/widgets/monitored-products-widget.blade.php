@@ -7,54 +7,54 @@
             </div>
         </x-slot>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-top: 0.75rem;">
             @foreach ($this->getProducts() as $product)
-                <div class="flex flex-col justify-between p-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm hover:shadow-md transition duration-200">
+                <div style="display: flex; flex-direction: column; justify-content: space-between; padding: 1.25rem; border-radius: 0.75rem; border: 1px solid rgba(229, 231, 235, 1); background-color: #ffffff; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);" class="dark:bg-gray-900 dark:border-gray-800">
                     <div>
-                        <div class="flex items-start gap-4">
+                        <div style="display: flex; align-items: flex-start; gap: 1rem;">
                             @if ($product['image_url'])
-                                <img src="{{ $product['image_url'] }}" alt="{{ $product['name'] }}" style="width: 64px; height: 64px; min-width: 64px; max-width: 64px; object-fit: contain;" class="rounded-lg border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 p-1 flex-shrink-0" />
+                                <img src="{{ $product['image_url'] }}" alt="{{ $product['name'] }}" style="width: 72px; height: 72px; min-width: 72px; max-width: 72px; object-fit: contain; border-radius: 0.5rem; border: 1px solid #f3f4f6; background-color: #fafafa; padding: 4px; flex-shrink: 0;" />
                             @else
-                                <div style="width: 64px; height: 64px; min-width: 64px; max-width: 64px;" class="rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-shrink-0 text-gray-400">
+                                <div style="width: 72px; height: 72px; min-width: 72px; max-width: 72px; border-radius: 0.5rem; background-color: #f3f4f6; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #9ca3af;">
                                     <x-filament::icon icon="heroicon-m-photo" class="h-8 w-8" />
                                 </div>
                             @endif
 
-                            <div class="flex-1 min-w-0">
-                                <div class="flex items-center gap-2 flex-wrap mb-1">
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200">
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.25rem;">
+                                    <span style="display: inline-flex; align-items: center; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 600; background-color: #f3f4f6; color: #1f2937;">
                                         {{ $product['brand'] }}
                                     </span>
                                     @if ($product['voltage'])
-                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200/50 dark:border-amber-800/40">
+                                        <span style="display: inline-flex; align-items: center; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 600; background-color: #fef3c7; color: #92400e; border: 1px solid rgba(251, 191, 36, 0.4);">
                                             {{ $product['voltage'] }}
                                         </span>
                                     @endif
                                 </div>
-                                <h4 class="text-sm font-bold text-gray-900 dark:text-white truncate" title="{{ $product['name'] }}">
+                                <h4 style="font-size: 0.875rem; font-weight: 700; color: #111827; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ $product['name'] }}">
                                     {{ $product['commercial_name'] }}
                                 </h4>
-                                <p class="text-xs text-gray-500 dark:text-gray-400 font-mono mt-0.5">
-                                    {{ $product['model_code'] }}
+                                <p style="font-size: 0.75rem; color: #6b7280; font-family: monospace; margin-top: 0.125rem;">
+                                    {{ $product['model_code'] ?? 'Universal' }}
                                 </p>
                             </div>
                         </div>
 
-                        <div class="mt-4 pt-3 border-t border-gray-100 dark:border-gray-800 grid grid-cols-2 gap-2 text-xs">
+                        <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid #f3f4f6; display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.75rem;">
                             <div>
-                                <span class="text-gray-500 dark:text-gray-400 block">Preço Alvo</span>
-                                <span class="font-semibold text-gray-700 dark:text-gray-300">
+                                <span style="color: #6b7280; display: block;">Preço Alvo</span>
+                                <span style="font-weight: 600; color: #374151;">
                                     {{ $product['target_price'] ? 'R$ ' . number_format($product['target_price'], 2, ',', '.') : 'Não definido' }}
                                 </span>
                             </div>
                             <div>
-                                <span class="text-gray-500 dark:text-gray-400 block">Menor Preço</span>
+                                <span style="color: #6b7280; display: block;">Menor Preço</span>
                                 @if ($product['current_price'])
-                                    <span class="font-bold text-base {{ $product['is_below_target'] ? 'text-emerald-600 dark:text-emerald-400' : 'text-primary-600 dark:text-primary-400' }}">
+                                    <span style="font-weight: 700; font-size: 1rem; color: {{ $product['is_below_target'] ? '#059669' : '#2563eb' }};">
                                         R$ {{ number_format($product['current_price'], 2, ',', '.') }}
                                     </span>
                                 @else
-                                    <span class="text-xs font-medium text-amber-600 dark:text-amber-400">
+                                    <span style="font-size: 0.75rem; font-weight: 500; color: #d97706;">
                                         Aguardando coleta
                                     </span>
                                 @endif
@@ -62,9 +62,9 @@
                         </div>
                     </div>
 
-                    <div class="mt-4 pt-2 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                    <div style="margin-top: 1rem; padding-top: 0.5rem; border-top: 1px solid #f9fafb; display: flex; align-items: center; justify-content: space-between; font-size: 0.75rem; color: #6b7280;">
                         <span>{{ $product['active_sources_count'] }} fonte(s) ativa(s)</span>
-                        <a href="{{ url('/admin/products') }}" class="font-medium text-primary-600 hover:text-primary-500 dark:text-primary-400 flex items-center gap-1">
+                        <a href="{{ url('/admin/products') }}" style="font-weight: 500; color: #2563eb; display: inline-flex; align-items: center; gap: 0.25rem; text-decoration: none;">
                             <span>Ver Produto</span>
                             <x-filament::icon icon="heroicon-m-arrow-right" class="h-3.5 w-3.5" />
                         </a>
