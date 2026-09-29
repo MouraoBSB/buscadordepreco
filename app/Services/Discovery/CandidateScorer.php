@@ -37,8 +37,28 @@ class CandidateScorer
             }
         }
 
-        // 2. Hard Constraints / Required Terms (+35 pts with model, +60 pts without model)
-        $constraintsWeight = $hasModel ? 35 : 60;
+        // 2. Product Name / Significant Keywords Match (+15 pts with model, +45 pts without model)
+        $nameKeywordsCount = (int) ($validation->matches['name_keywords_matched'] ?? 0);
+        $nameWeight = $hasModel ? 15 : 45;
+        if ($nameKeywordsCount > 0) {
+            $score += $nameWeight;
+            $breakdown['name_keywords_matched'] = $nameWeight;
+        } else {
+            $breakdown['name_keywords_matched'] = 0;
+        }
+
+        // 3. Brand Match (+15 pts with model, +25 pts without model)
+        $brandWeight = $hasModel ? 15 : 25;
+        $brandMatched = ! empty($validation->matches['brand_matched']);
+        if ($brandMatched) {
+            $score += $brandWeight;
+            $breakdown['brand_matched'] = $brandWeight;
+        } else {
+            $breakdown['brand_matched'] = 0;
+        }
+
+        // 4. Hard Constraints / Required Terms (+20 pts with model, +15 pts without model)
+        $constraintsWeight = $hasModel ? 20 : 15;
         $matchedConstraints = 0;
         $totalConstraints = 0;
 
@@ -68,21 +88,16 @@ class CandidateScorer
             $score += $pts;
             $breakdown['hard_constraints_matched'] = $pts;
         } else {
-            // No specific hard constraints, award full points if no negative signals
-            $score += $constraintsWeight;
-            $breakdown['hard_constraints_matched'] = $constraintsWeight;
+            // When no hard constraints exist, award points only if name or brand matched
+            if ($nameKeywordsCount > 0 || $brandMatched) {
+                $score += $constraintsWeight;
+                $breakdown['hard_constraints_matched'] = $constraintsWeight;
+            } else {
+                $breakdown['hard_constraints_matched'] = 0;
+            }
         }
 
-        // 3. Brand Match (+15 pts with model, +25 pts without model)
-        $brandWeight = $hasModel ? 15 : 25;
-        if (! empty($validation->matches['brand_matched'])) {
-            $score += $brandWeight;
-            $breakdown['brand_matched'] = $brandWeight;
-        } else {
-            $breakdown['brand_matched'] = 0;
-        }
-
-        // 4. Product Page Structure (+10 pts with model, +15 pts without model)
+        // 5. Product Page Structure (+10 pts with model, +15 pts without model)
         $urlWeight = $hasModel ? 10 : 15;
         if ($this->isProductPageUrl($candidate->url)) {
             $score += $urlWeight;
