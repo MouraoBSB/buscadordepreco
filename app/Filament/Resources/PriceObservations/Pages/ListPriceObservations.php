@@ -3,7 +3,7 @@
 namespace App\Filament\Resources\PriceObservations\Pages;
 
 use App\Filament\Resources\PriceObservations\PriceObservationResource;
-use Filament\Actions\CreateAction;
+use App\Filament\Resources\PriceObservations\Widgets\PriceHistoryChartWidget;
 use Filament\Resources\Pages\ListRecords;
 
 class ListPriceObservations extends ListRecords
@@ -12,8 +12,13 @@ class ListPriceObservations extends ListRecords
 
     protected function getHeaderActions(): array
     {
+        return [];
+    }
+
+    protected function getHeaderWidgets(): array
+    {
         return [
-            CreateAction::make(),
+            PriceHistoryChartWidget::class,
         ];
     }
 }

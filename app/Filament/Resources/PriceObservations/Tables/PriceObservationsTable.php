@@ -59,7 +59,15 @@ class PriceObservationsTable
             ])
             ->defaultSort('collected_at', 'desc')
             ->filters([
-                //
+                \Filament\Tables\Filters\SelectFilter::make('product')
+                    ->label('Filtrar por Produto')
+                    ->options(fn () => \App\Models\Product::all()->mapWithKeys(fn ($p) => [$p->id => ($p->brand ? $p->brand . ' - ' : '') . ($p->commercial_name ?: $p->name)])->toArray())
+                    ->query(fn ($query, array $data) => ! empty($data['value']) ? $query->whereHas('source', fn ($q) => $q->where('product_id', $data['value'])) : $query),
+
+                \Filament\Tables\Filters\SelectFilter::make('store')
+                    ->label('Filtrar por Loja')
+                    ->options(fn () => \App\Models\Store::pluck('name', 'id')->toArray())
+                    ->query(fn ($query, array $data) => ! empty($data['value']) ? $query->whereHas('source', fn ($q) => $q->where('store_id', $data['value'])) : $query),
             ])
             ->recordActions([
                 ViewAction::make(),
