@@ -9,10 +9,12 @@ use Illuminate\Support\Str;
 class ProductEnrichmentService
 {
     protected array $knownBrands = [
-        'Midea', 'Panasonic', 'Samsung', 'LG', 'Apple', 'Sony', 'Electrolux',
+        'Midea', 'Panasonic', 'Samsung', 'LG', 'Apple', 'Sony', 'Nintendo',
+        'Microsoft', 'Xbox', 'PlayStation', 'Valve', 'Steam', 'Electrolux',
         'Brastemp', 'Consul', 'Dell', 'Asus', 'Lenovo', 'Xiaomi', 'TCL',
         'Philips', 'JBL', 'Motorola', 'Acer', 'Britânia', 'Mondial', 'Arno',
         'Philco', 'Oster', 'Cadence', 'Walita', 'Kingston', 'Corsair', 'Logitech',
+        'Razer', 'HyperX', 'Anker', 'Baseus', 'Google', 'Amazon', 'Intel', 'AMD',
     ];
 
     /**
@@ -128,9 +130,13 @@ class ProductEnrichmentService
             }
         }
 
-        $words = explode(' ', $input);
-        if (! empty($words) && ctype_upper(substr($words[0], 0, 1))) {
-            return $words[0];
+        $words = array_values(array_filter(explode(' ', trim($input))));
+        if (! empty($words)) {
+            $firstWord = $words[0];
+            $stopWords = ['o', 'a', 'os', 'as', 'um', 'uma', 'de', 'do', 'da', 'com', 'sem', 'para', 'em', 'no', 'na', 'the'];
+            if (mb_strlen($firstWord) >= 3 && ! in_array(mb_strtolower($firstWord), $stopWords, true)) {
+                return ucfirst(mb_strtolower($firstWord, 'UTF-8'));
+            }
         }
 
         return null;
@@ -224,6 +230,9 @@ class ProductEnrichmentService
         }
         if (preg_match('/(notebook|macbook|laptop|computador|ssd)/i', $inputLower)) {
             return 'Informática & Armazenamento';
+        }
+        if (preg_match('/(videogame|video\s*game|console|switch|playstation|ps5|ps4|xbox|nintendo)/i', $inputLower)) {
+            return 'Games & Consoles';
         }
         if (preg_match('/(celular|smartphone|iphone|galaxy)/i', $inputLower)) {
             return 'Smartphones & Telefonia';

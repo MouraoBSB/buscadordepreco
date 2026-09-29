@@ -82,8 +82,8 @@ class ProductForm
                             ->maxLength(255),
 
                         TextInput::make('brand')
-                            ->label('Marca')
-                            ->required()
+                            ->label('Marca / Fabricante')
+                            ->placeholder('Ex: Nintendo, Apple, Sony (opcional)')
                             ->maxLength(100),
 
                         TextInput::make('model_code')
