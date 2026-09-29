@@ -31,7 +31,7 @@ class AlertsTable
 
                 TextColumn::make('payload.price')
                     ->label('Preço Alerta')
-                    ->money('BRL'),
+                    ->money('BRL', locale: 'pt_BR'),
 
                 TextColumn::make('sent_at')
                     ->label('Enviado em')

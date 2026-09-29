@@ -48,12 +48,20 @@ class PriceObservationResource extends Resource
         ];
     }
 
+    public static function canCreate(): bool
+    {
+        return false;
+    }
+
+    public static function canEdit($record): bool
+    {
+        return false;
+    }
+
     public static function getPages(): array
     {
         return [
             'index' => ListPriceObservations::route('/'),
-            'create' => CreatePriceObservation::route('/create'),
-            'edit' => EditPriceObservation::route('/{record}/edit'),
         ];
     }
 }

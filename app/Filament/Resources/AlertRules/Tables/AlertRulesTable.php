@@ -40,7 +40,7 @@ class AlertRulesTable
 
                 TextColumn::make('threshold')
                     ->label('Limite')
-                    ->money('BRL')
+                    ->money('BRL', locale: 'pt_BR')
                     ->placeholder('Qualquer queda'),
 
                 TextColumn::make('channel')

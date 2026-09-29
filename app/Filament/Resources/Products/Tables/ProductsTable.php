@@ -50,7 +50,7 @@ class ProductsTable
 
                 TextColumn::make('target_price')
                     ->label('Preço Alvo')
-                    ->money('BRL')
+                    ->money('BRL', locale: 'pt_BR')
                     ->sortable(),
 
                 TextColumn::make('candidates_count')

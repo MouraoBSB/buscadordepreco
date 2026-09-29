@@ -38,7 +38,7 @@ class ProductSourcesTable
 
                 TextColumn::make('latestObservation.effective_price')
                     ->label('Último Preço')
-                    ->money('BRL')
+                    ->money('BRL', locale: 'pt_BR')
                     ->placeholder('Nenhum'),
 
                 TextColumn::make('latestObservation.in_stock')

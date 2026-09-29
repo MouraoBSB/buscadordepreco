@@ -27,12 +27,12 @@ class PriceObservationsTable
 
                 TextColumn::make('regular_price')
                     ->label('Preço Normal')
-                    ->money('BRL')
+                    ->money('BRL', locale: 'pt_BR')
                     ->sortable(),
 
                 TextColumn::make('pix_price')
                     ->label('Preço Pix')
-                    ->money('BRL')
+                    ->money('BRL', locale: 'pt_BR')
                     ->weight('bold')
                     ->color('success')
                     ->sortable(),
