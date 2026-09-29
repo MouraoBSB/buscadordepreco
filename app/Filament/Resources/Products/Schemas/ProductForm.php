@@ -3,7 +3,7 @@
 namespace App\Filament\Resources\Products\Schemas;
 
 use App\Services\Profiling\ProductEnrichmentService;
-use Filament\Forms\Components\Actions\Action;
+use Filament\Actions\Action;
 use Filament\Forms\Components\KeyValue;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TagsInput;
