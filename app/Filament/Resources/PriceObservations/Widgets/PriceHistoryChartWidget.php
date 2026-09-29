@@ -18,7 +18,7 @@ class PriceHistoryChartWidget extends ChartWidget
 
     protected function getFilters(): ?array
     {
-        $products = Product::whereHas('sources.priceObservations')
+        $products = Product::whereHas('sources.observations')
             ->get()
             ->mapWithKeys(fn ($p) => [(string) $p->id => ($p->brand ? $p->brand . ' - ' : '') . ($p->commercial_name ?: $p->name)])
             ->toArray();
