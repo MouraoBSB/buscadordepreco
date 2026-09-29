@@ -8,11 +8,11 @@ use Filament\Widgets\ChartWidget;
 
 class PriceHistoryChartWidget extends ChartWidget
 {
-    protected static ?string $heading = 'Evolução dos Preços Coletados';
+    protected ?string $heading = 'Evolução dos Preços Coletados';
 
     protected int | string | array $columnSpan = 'full';
 
-    protected static ?string $maxHeight = '280px';
+    protected ?string $maxHeight = '280px';
 
     public ?string $filter = null;
 
