@@ -140,7 +140,17 @@ class GenericJsonLdCollector extends BaseCollector
             $price = $this->parsePrice($m[1]);
         } elseif (preg_match('/<meta\b[^>]*itemprop=[\'"]price[\'"][^>]*content=[\'"](.*?)[\'"]/i', $html, $m)) {
             $price = $this->parsePrice($m[1]);
-        } elseif (preg_match('/R\$\s*([\d\.]*,\d{2})/i', $html, $m)) {
+        } elseif (preg_match('/class=[\'"]a-price-whole[\'"][^>]*>([\d\.,]+)/i', $html, $mWhole)) {
+            // Amazon price pattern: separate whole and fraction tags
+            $whole = preg_replace('/[^\d]/', '', $mWhole[1]);
+            $fraction = '00';
+            if (preg_match('/class=[\'"]a-price-fraction[\'"][^>]*>(\d{2})/i', $html, $mFraction)) {
+                $fraction = $mFraction[1];
+            }
+            $price = (float) ($whole . '.' . $fraction);
+        } elseif (preg_match('/class=[\'"]a-offscreen[\'"][^>]*>\s*R\$\s*([\d\.,]+)/iu', $html, $m)) {
+            $price = $this->parsePrice($m[1]);
+        } elseif (preg_match('/R\$\s*([\d\.]*,\d{2})/iu', $html, $m)) {
             $price = $this->parsePrice($m[1]);
         }
 
