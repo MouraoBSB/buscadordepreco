@@ -107,6 +107,8 @@ class CandidateValidator
             if (str_contains($text, $brandLower) || str_contains(mb_strtolower($candidate->getDomain(), 'UTF-8'), $brandLower)) {
                 $matches['brand_matched'] = true;
             }
+        }
+
         // 6. Name Keywords Match
         $matchedTokens = $this->getMatchedProductTokens($product, $text);
         if (! empty($matchedTokens)) {
