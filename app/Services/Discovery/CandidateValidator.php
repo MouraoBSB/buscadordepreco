@@ -76,6 +76,36 @@ class CandidateValidator
             }
         }
 
+        // Check Capacity (kg)
+        $expectedCapacity = $product->capacity_kg ?? $hardConstraints['capacity_kg'] ?? null;
+        if ($expectedCapacity) {
+            $capFloat = (float) $expectedCapacity;
+            if (preg_match_all('/\b(\d{1,2}(?:[\.,]\d)?)\s*(?:kg|kilos|quilos)\b/ui', $text, $capMatches)) {
+                $foundCapacities = [];
+                foreach ($capMatches[1] as $rawVal) {
+                    $foundCapacities[] = (float) str_replace(',', '.', $rawVal);
+                }
+
+                $hasMatchingCapacity = false;
+                foreach ($foundCapacities as $foundCap) {
+                    if (abs($foundCap - $capFloat) < 0.2) {
+                        $hasMatchingCapacity = true;
+                        break;
+                    }
+                }
+
+                if (! $hasMatchingCapacity && count($foundCapacities) > 0) {
+                    $foundStr = implode('kg, ', $foundCapacities).'kg';
+
+                    return CandidateValidationResult::reject("Capacidade incompatível: anúncio menciona {$foundStr}, mas o produto monitorado é de {$expectedCapacity}kg.");
+                }
+
+                if ($hasMatchingCapacity) {
+                    $matches['capacity_confirmed'] = true;
+                }
+            }
+        }
+
         // Check Agitator
         if (isset($hardConstraints['has_agitator']) && $hardConstraints['has_agitator'] === false) {
             $isExplicitlyWithout = (bool) preg_match('/(sem\s*agitador|dispensa\s*agitador)/i', $text);

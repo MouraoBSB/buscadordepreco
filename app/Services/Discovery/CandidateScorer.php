@@ -126,7 +126,22 @@ class CandidateScorer
             default => 'rejected',
         };
 
-        $rejectionReason = ($status === 'rejected') ? 'Baixa pontuação de confiança (score < 60%).' : null;
+        if ($status === 'rejected') {
+            $missing = [];
+            if ($hasModel && empty($breakdown['model_code_matched'])) {
+                $missing[] = 'código do modelo não identificado';
+            }
+            if (empty($breakdown['brand_matched'])) {
+                $missing[] = 'marca não confirmada';
+            }
+            if (empty($breakdown['hard_constraints_matched'])) {
+                $missing[] = 'voltagem/capacidade pendente ou divergente';
+            }
+            $missingText = ! empty($missing) ? ' ('.implode(', ', $missing).')' : '';
+            $rejectionReason = "Baixa pontuação de confiança: {$score}% < 60%{$missingText}.";
+        } else {
+            $rejectionReason = null;
+        }
 
         return [
             'score' => $score,

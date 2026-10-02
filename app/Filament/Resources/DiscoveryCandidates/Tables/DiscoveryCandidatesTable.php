@@ -3,14 +3,18 @@
 namespace App\Filament\Resources\DiscoveryCandidates\Tables;
 
 use App\Models\DiscoveryCandidate;
+use App\Models\Product;
 use App\Models\ProductSource;
 use App\Models\Store;
+use App\Services\Collector\Pipeline\CollectionPipeline;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Notifications\Notification;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Log;
 
 class DiscoveryCandidatesTable
 {
@@ -39,13 +43,14 @@ class DiscoveryCandidatesTable
                     ->color('primary')
                     ->weight('medium')
                     ->limit(55)
-                    ->tooltip(fn (DiscoveryCandidate $record): string => ($record->raw_title ?? '') . ' (Clique para abrir na loja)'),
+                    ->tooltip(fn (DiscoveryCandidate $record): string => ($record->raw_title ?? '').' (Clique para abrir na loja)'),
 
                 TextColumn::make('confidence_score')
                     ->label('Score')
                     ->suffix('%')
                     ->sortable()
                     ->badge()
+                    ->tooltip('Clique em "Ver Critérios" para conferir a pontuação detalhada')
                     ->color(fn (?int $state): string => match (true) {
                         $state >= 85 => 'success',
                         $state >= 60 => 'warning',
@@ -73,7 +78,7 @@ class DiscoveryCandidatesTable
                 TextColumn::make('rejection_reason')
                     ->label('Motivo / Incompatibilidade')
                     ->placeholder('—')
-                    ->limit(35)
+                    ->limit(45)
                     ->tooltip(fn (DiscoveryCandidate $record): ?string => $record->rejection_reason),
 
                 TextColumn::make('discovery_provider')
@@ -88,14 +93,15 @@ class DiscoveryCandidatesTable
                     ->sortable(),
             ])
             ->defaultSort('discovered_at', 'desc')
+            ->recordAction('view_details')
             ->filters([
-                \Filament\Tables\Filters\SelectFilter::make('product_id')
+                SelectFilter::make('product_id')
                     ->label('Filtrar por Produto')
-                    ->options(fn () => \App\Models\Product::all()->mapWithKeys(fn ($p) => [$p->id => ($p->brand ? $p->brand . ' - ' : '') . ($p->commercial_name ?: $p->name)])->toArray())
+                    ->options(fn () => Product::all()->mapWithKeys(fn ($p) => [$p->id => ($p->brand ? $p->brand.' - ' : '').($p->commercial_name ?: $p->name)])->toArray())
                     ->searchable()
                     ->preload(),
 
-                \Filament\Tables\Filters\SelectFilter::make('status')
+                SelectFilter::make('status')
                     ->label('Status')
                     ->options([
                         'auto_approved' => 'Auto Aprovado',
@@ -104,11 +110,21 @@ class DiscoveryCandidatesTable
                         'rejected' => 'Rejeitado',
                     ]),
 
-                \Filament\Tables\Filters\SelectFilter::make('discovered_store_name')
+                SelectFilter::make('discovered_store_name')
                     ->label('Filtrar por Loja')
-                    ->options(fn () => \App\Models\DiscoveryCandidate::whereNotNull('discovered_store_name')->distinct()->pluck('discovered_store_name', 'discovered_store_name')->toArray()),
+                    ->options(fn () => DiscoveryCandidate::whereNotNull('discovered_store_name')->distinct()->pluck('discovered_store_name', 'discovered_store_name')->toArray()),
             ])
             ->recordActions([
+                Action::make('view_details')
+                    ->label('Ver Critérios')
+                    ->icon('heroicon-o-information-circle')
+                    ->color('gray')
+                    ->modalHeading('Critérios e Pontuação da Oferta')
+                    ->modalWidth('2xl')
+                    ->modalContent(fn (DiscoveryCandidate $record) => view('filament.modals.candidate-score-details', ['candidate' => $record]))
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Fechar'),
+
                 Action::make('approve')
                     ->label('Aprovar e Monitorar')
                     ->icon('heroicon-o-check-circle')
@@ -158,9 +174,9 @@ class DiscoveryCandidatesTable
                         // Run immediate collection on this new source in background
                         dispatch(function () use ($source) {
                             try {
-                                app(\App\Services\Collector\Pipeline\CollectionPipeline::class)->run($source);
+                                app(CollectionPipeline::class)->run($source);
                             } catch (\Throwable $e) {
-                                \Illuminate\Support\Facades\Log::warning("Collection on approve failed for source {$source->id}: {$e->getMessage()}");
+                                Log::warning("Collection on approve failed for source {$source->id}: {$e->getMessage()}");
                             }
                         })->afterResponse();
 
