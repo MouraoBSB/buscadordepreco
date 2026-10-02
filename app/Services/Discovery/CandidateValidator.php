@@ -31,6 +31,22 @@ class CandidateValidator
             return CandidateValidationResult::reject('Título do anúncio não possui correspondência com o produto monitorado (marca ou termos principais ausentes).');
         }
 
+        // 1.1 Generation / Version Check (e.g. Switch 2 vs Switch 1, PS5 vs PS4)
+        $nameForVersion = $product->commercial_name ?: $product->name;
+        if (preg_match('/\b([a-zA-Z]+)\s*(\d{1,2})\b/u', $nameForVersion, $mVersion)) {
+            $wordPrefix = mb_strtolower($mVersion[1], 'UTF-8');
+            $verNum = $mVersion[2];
+
+            if (! in_array($wordPrefix, ['de', 'da', 'do', 'em', 'kg', 'litros', 'polegadas', 'pol', 'volts', 'volt', 'v'], true)) {
+                $hasVersionNumber = (bool) preg_match('/\b'.preg_quote($wordPrefix, '/').'\s*'.$verNum.'\b/iu', $text)
+                    || (bool) preg_match('/\b'.$verNum.'\b/u', $text);
+
+                if (! $hasVersionNumber) {
+                    return CandidateValidationResult::reject("Geração/Versão incompatível: anúncio não menciona a versão {$verNum} ({$wordPrefix} {$verNum}).");
+                }
+            }
+        }
+
         // 2. Forbidden Terms Check (contextual protection from Product Profiling)
         $forbiddenTerms = $product->forbidden_terms ?? [];
         foreach ($forbiddenTerms as $term) {
