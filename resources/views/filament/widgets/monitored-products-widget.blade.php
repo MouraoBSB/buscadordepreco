@@ -7,6 +7,18 @@
             </div>
         </x-slot>
 
+        <x-slot name="afterHeader">
+            <x-filament::button
+                size="sm"
+                color="primary"
+                icon="heroicon-m-sparkles"
+                wire:click="discoverAll"
+                wire:loading.attr="disabled"
+            >
+                Buscar Ofertas em Todos
+            </x-filament::button>
+        </x-slot>
+
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-top: 0.75rem;">
             @foreach ($this->getProducts() as $product)
                 <div style="display: flex; flex-direction: column; justify-content: space-between; padding: 1.25rem; border-radius: 0.75rem; border: 1px solid rgba(229, 231, 235, 1); background-color: #ffffff; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);" class="dark:bg-gray-900 dark:border-gray-800">
@@ -64,13 +76,27 @@
 
                     <div style="margin-top: 1rem; padding-top: 0.5rem; border-top: 1px solid #f9fafb; display: flex; align-items: center; justify-content: space-between; font-size: 0.75rem; color: #6b7280;">
                         <span>{{ $product['active_sources_count'] }} fonte(s) ativa(s)</span>
-                        <a href="{{ url('/admin/products') }}" style="font-weight: 500; color: #2563eb; display: inline-flex; align-items: center; gap: 0.25rem; text-decoration: none;">
-                            <span>Ver Produto</span>
-                            <x-filament::icon icon="heroicon-m-arrow-right" class="h-3.5 w-3.5" />
-                        </a>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <x-filament::button
+                                size="xs"
+                                color="gray"
+                                icon="heroicon-m-sparkles"
+                                wire:click="discoverProduct({{ $product['id'] }})"
+                                wire:loading.attr="disabled"
+                                title="Buscar ofertas para este produto"
+                            >
+                                Buscar Ofertas
+                            </x-filament::button>
+
+                            <a href="{{ \App\Filament\Resources\Products\ProductResource::getUrl('edit', ['record' => $product['id']]) }}" style="font-weight: 500; color: #2563eb; display: inline-flex; align-items: center; gap: 0.25rem; text-decoration: none; padding: 0.25rem 0.5rem;">
+                                <span>Ver</span>
+                                <x-filament::icon icon="heroicon-m-arrow-right" class="h-3.5 w-3.5" />
+                            </a>
+                        </div>
                     </div>
                 </div>
             @endforeach
         </div>
     </x-filament::section>
 </x-filament-widgets::widget>
+
