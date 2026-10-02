@@ -4,7 +4,6 @@ namespace App\Services\Profiling;
 
 use App\Models\ApiUsageLog;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Str;
 
 class ProductEnrichmentService
 {
@@ -348,13 +347,25 @@ class ProductEnrichmentService
         }
         if ($keyConstraint) {
             $queries[] = trim(($brand ? $brand.' ' : '').$commercialName.$keyConstraint);
+            $queries[] = trim('comprar '.($brand ? $brand.' ' : '').$commercialName.$keyConstraint);
         }
 
-        // 3. Narrow query: Exact Model Code (if identified)
+        // 3. Model Code queries (with and without quotes, and model family root)
         if ($modelCode) {
-            $queries[] = trim(($brand ? $brand.' ' : '').'"'.$modelCode.'"');
-            if (isset($hardConstraints['voltage'])) {
-                $queries[] = trim(($brand ? $brand.' ' : '').'"'.$modelCode.'" '.$hardConstraints['voltage']);
+            $queries[] = trim(($brand ? $brand.' ' : '').$modelCode.($keyConstraint ? ' '.$keyConstraint : ''));
+
+            // Clean model prefix (e.g. MA512W165 from MA512W165/GK-05)
+            $modelPrefix = explode('/', $modelCode)[0];
+            if ($modelPrefix !== $modelCode && strlen($modelPrefix) >= 5) {
+                $queries[] = trim(($brand ? $brand.' ' : '').$modelPrefix.($keyConstraint ? ' '.$keyConstraint : ''));
+            }
+
+            // Clean 6-character root for long codes (e.g. WA17CG from WA17CG6746BVBZ)
+            if (strlen($modelCode) >= 8) {
+                $root6 = substr(preg_replace('/[^A-Za-z0-9]/', '', $modelCode), 0, 6);
+                if (strlen($root6) >= 5) {
+                    $queries[] = trim(($brand ? $brand.' ' : '').$root6.($keyConstraint ? ' '.$keyConstraint : ''));
+                }
             }
         }
 

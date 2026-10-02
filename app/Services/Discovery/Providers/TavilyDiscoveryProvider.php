@@ -47,7 +47,7 @@ class TavilyDiscoveryProvider implements DiscoveryProviderInterface
             $startTime = microtime(true);
 
             try {
-                $searchQuery = $query.' comprar loja preco brasil';
+                $searchQuery = trim($query);
 
                 $response = Http::withHeaders([
                     'Content-Type' => 'application/json',
@@ -58,7 +58,7 @@ class TavilyDiscoveryProvider implements DiscoveryProviderInterface
                         'query' => $searchQuery,
                         'search_depth' => 'basic',
                         'include_images' => true,
-                        'max_results' => 8,
+                        'max_results' => 15,
                         'include_domains' => [
                             'magazineluiza.com.br',
                             'mercadolivre.com.br',
@@ -68,6 +68,12 @@ class TavilyDiscoveryProvider implements DiscoveryProviderInterface
                             'pontofrio.com.br',
                             'extra.com.br',
                             'amazon.com.br',
+                            'shopee.com.br',
+                            'girafa.com.br',
+                            'webcontinental.com.br',
+                            'leveros.com.br',
+                            'dufrio.com.br',
+                            'frigelar.com.br',
                             'mideastore.com.br',
                             'midea.com.br',
                             'panasonic.com.br',

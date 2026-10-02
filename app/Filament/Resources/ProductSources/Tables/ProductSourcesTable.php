@@ -18,17 +18,27 @@ class ProductSourcesTable
     public static function configure(Table $table): Table
     {
         return $table
+            ->recordUrl(fn (ProductSource $record): ?string => $record->url, shouldOpenInNewTab: true)
+            ->recordAction(null)
             ->columns([
                 TextColumn::make('product.name')
                     ->label('Produto')
                     ->searchable()
                     ->sortable()
+                    ->color('primary')
                     ->weight('bold')
+                    ->icon('heroicon-m-arrow-top-right-on-square')
+                    ->iconPosition('after')
+                    ->url(fn (ProductSource $record): ?string => $record->url)
+                    ->openUrlInNewTab()
+                    ->tooltip(fn (ProductSource $record): string => 'Abrir link na loja')
                     ->limit(35),
 
                 TextColumn::make('store.name')
                     ->label('Loja')
                     ->badge()
+                    ->url(fn (ProductSource $record): ?string => $record->url)
+                    ->openUrlInNewTab()
                     ->sortable(),
 
                 TextColumn::make('expected_voltage')
@@ -70,6 +80,13 @@ class ProductSourcesTable
                 //
             ])
             ->recordActions([
+                Action::make('open_url')
+                    ->label('Abrir Link')
+                    ->icon('heroicon-o-arrow-top-right-on-square')
+                    ->color('gray')
+                    ->url(fn (ProductSource $record): ?string => $record->url)
+                    ->openUrlInNewTab(),
+
                 Action::make('collect_now')
                     ->label('Coletar')
                     ->icon('heroicon-o-arrow-path')

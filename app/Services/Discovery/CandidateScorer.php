@@ -33,7 +33,18 @@ class CandidateScorer
                 $score += 40;
                 $breakdown['model_code_matched'] = 40;
             } else {
-                $breakdown['model_code_matched'] = 0;
+                // If model SKU was not in title, but candidate has high commercial identity match
+                // (brand + commercial name keywords matched), award 25 pts so legitimate retail offers
+                // can reach auto_approved status instead of being locked at 60%
+                $highIdentityMatch = ! empty($validation->matches['brand_matched'])
+                    && ($validation->matches['name_keywords_matched'] ?? 0) >= 2;
+
+                if ($highIdentityMatch) {
+                    $score += 25;
+                    $breakdown['model_code_matched'] = 25;
+                } else {
+                    $breakdown['model_code_matched'] = 0;
+                }
             }
         }
 

@@ -94,10 +94,15 @@ class GenericJsonLdCollector extends BaseCollector
             }
         }
 
+        // Also check HTML out-of-stock indicators even if JSON-LD exists
+        if ($this->detectOutOfStock($html, $source)) {
+            $inStock = false;
+        }
+
         // Check if price was found
         if ($price === null) {
             // Try extracting from HTML regex
-            return $this->fallbackHtmlParsing($source, $html, $fetch['status'], $durationMs, $rawTitle);
+            return $this->fallbackHtmlParsing($source, $html, $fetch['status'], $durationMs, $rawTitle, $inStock);
         }
 
         return PriceResult::success(
@@ -115,8 +120,14 @@ class GenericJsonLdCollector extends BaseCollector
     /**
      * Fallback parser for stores that don't output valid schema.org JSON-LD.
      */
-    protected function fallbackHtmlParsing(ProductSource $source, string $html, ?int $httpStatus, int $durationMs, ?string $detectedTitle = null): PriceResult
-    {
+    protected function fallbackHtmlParsing(
+        ProductSource $source,
+        string $html,
+        ?int $httpStatus,
+        int $durationMs,
+        ?string $detectedTitle = null,
+        bool $knownInStock = true
+    ): PriceResult {
         // Extract title from <title> tag if not present
         if (! $detectedTitle && preg_match('/<title\b[^>]*>(.*?)<\/title>/is', $html, $m)) {
             $detectedTitle = trim(html_entity_decode(strip_tags($m[1])));
@@ -134,27 +145,46 @@ class GenericJsonLdCollector extends BaseCollector
             );
         }
 
+        // Check availability / stock
+        $inStock = $knownInStock && ! $this->detectOutOfStock($html, $source);
+
+        // Scope HTML to main product container to avoid capturing recommendation/carousel prices
+        $searchHtml = $this->isolateMainProductHtml($html, $source);
+
         // Try open graph or meta price
         $price = null;
         if (preg_match('/<meta\b[^>]*property=[\'"]product:price:amount[\'"][^>]*content=[\'"](.*?)[\'"]/i', $html, $m)) {
             $price = $this->parsePrice($m[1]);
         } elseif (preg_match('/<meta\b[^>]*itemprop=[\'"]price[\'"][^>]*content=[\'"](.*?)[\'"]/i', $html, $m)) {
             $price = $this->parsePrice($m[1]);
-        } elseif (preg_match('/class=[\'"]a-price-whole[\'"][^>]*>([\d\.,]+)/i', $html, $mWhole)) {
-            // Amazon price pattern: separate whole and fraction tags
+        } elseif (preg_match('/class=[\'"]a-price-whole[\'"][^>]*>([\d\.,]+)/i', $searchHtml, $mWhole)) {
+            // Amazon price pattern: separate whole and fraction tags inside main product section
             $whole = preg_replace('/[^\d]/', '', $mWhole[1]);
             $fraction = '00';
-            if (preg_match('/class=[\'"]a-price-fraction[\'"][^>]*>(\d{2})/i', $html, $mFraction)) {
+            if (preg_match('/class=[\'"]a-price-fraction[\'"][^>]*>(\d{2})/i', $searchHtml, $mFraction)) {
                 $fraction = $mFraction[1];
             }
-            $price = (float) ($whole . '.' . $fraction);
-        } elseif (preg_match('/class=[\'"]a-offscreen[\'"][^>]*>\s*R\$\s*([\d\.,]+)/iu', $html, $m)) {
+            $price = (float) ($whole.'.'.$fraction);
+        } elseif (preg_match('/class=[\'"]a-offscreen[\'"][^>]*>\s*R\$\s*([\d\.,]+)/iu', $searchHtml, $m)) {
             $price = $this->parsePrice($m[1]);
-        } elseif (preg_match('/R\$\s*([\d\.]*,\d{2})/iu', $html, $m)) {
+        } elseif (preg_match('/R\$\s*([\d\.]*,\d{2})/iu', $searchHtml, $m)) {
             $price = $this->parsePrice($m[1]);
         }
 
+        // If product is out of stock and has no main price, record as out-of-stock observation
         if ($price === null) {
+            if (! $inStock) {
+                return PriceResult::success(
+                    regularPrice: null,
+                    pixPrice: null,
+                    inStock: false,
+                    rawTitle: $detectedTitle,
+                    metadata: ['collector' => 'html_fallback', 'stock_status' => 'out_of_stock'],
+                    httpStatus: $httpStatus,
+                    durationMs: $durationMs
+                );
+            }
+
             return PriceResult::failure(
                 errorMessage: 'Preço não encontrado na página nem no JSON-LD.',
                 errorCode: 'PRICE_NOT_FOUND',
@@ -166,11 +196,90 @@ class GenericJsonLdCollector extends BaseCollector
         return PriceResult::success(
             regularPrice: $price,
             pixPrice: null,
-            inStock: true,
+            inStock: $inStock,
             rawTitle: $detectedTitle,
             metadata: ['collector' => 'html_fallback'],
             httpStatus: $httpStatus,
             durationMs: $durationMs
         );
+    }
+
+    /**
+     * Detect if the product page indicates out of stock / unavailable.
+     */
+    protected function detectOutOfStock(string $html, ProductSource $source): bool
+    {
+        $domain = parse_url($source->url, PHP_URL_HOST) ?? '';
+
+        if (str_contains($domain, 'amazon.com')) {
+            // Amazon availability div or outOfStock div
+            if (preg_match('/id=[\'"](?:availability|outOfStock)[\'"][^>]*>(.*?)<\/div>/is', $html, $m)) {
+                $text = mb_strtolower(strip_tags($m[1]), 'UTF-8');
+                if (preg_match('/(n[ãa]o\s+dispon[íi]vel|atualmente\s+indispon[íi]vel|esgotado|sem\s+estoque|out\s+of\s+stock)/iu', $text)) {
+                    return true;
+                }
+            }
+
+            // Amazon specific phrase in buybox
+            if (preg_match('/(n[ãa]o\s+temos\s+previs[ãa]o\s+de\s+quando\s+este\s+produto\s+estar[áa]\s+dispon[íi]vel|atualmente\s+indispon[íi]vel|n[ãa]o\s+dispon[íi]vel\s+por\s+este\s+vendedor)/iu', $html)) {
+                return true;
+            }
+        }
+
+        // Generic patterns across e-commerce stores
+        $patterns = [
+            '/id=[\'"](?:availability|outOfStock|estoque-indisponivel)[\'"][^>]*>(.*?)<\/(?:div|span|p)>/is',
+            '/\b(?:produto\s+(?:temporariamente\s+)?indispon[íi]vel|produto\s+esgotado|avise-me\s+quando\s+chegar|fora\s+de\s+estoque|sem\s+estoque)\b/iu',
+            '/ops!?[,\s]+(?:este\s+produto\s+est[áa]\s+esgotado|j[áa]\s+vendemos\s+todo\s+o\s+estoque)/iu',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $html)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Isolate the main product section from the HTML to avoid parsing prices from recommendation carousels.
+     */
+    protected function isolateMainProductHtml(string $html, ProductSource $source): string
+    {
+        $domain = parse_url($source->url, PHP_URL_HOST) ?? '';
+
+        if (str_contains($domain, 'amazon.com')) {
+            // Priority 1: Direct price blocks
+            if (preg_match('/<div\b[^>]*id=[\'"](?:apex_desktop|corePrice_desktop|corePriceDisplay_desktop_feature_div)[\'"][^>]*>(.*?)<\/div>\s*<\/div>/is', $html, $mPrice)) {
+                return $mPrice[0];
+            }
+
+            // Priority 2: Product Page Details (#ppd or #centerCol)
+            if (preg_match('/<div\b[^>]*id=[\'"](?:ppd|centerCol)[\'"][^>]*>(.*?)<\/div>\s*<\/div>/is', $html, $mPpd)) {
+                return $mPpd[0];
+            }
+
+            // Priority 3: Cut off at first recommendation carousel
+            $parts = preg_split('/id=[\'"](?:desktop-dp-sims|sp_detail|session-similarities|dp-ads|sims-consolidated)[\'"]/i', $html);
+            if (! empty($parts[0])) {
+                return $parts[0];
+            }
+        }
+
+        // Generic: cut off recommendation/carousel sections if present
+        $cutPatterns = [
+            '/class=[\'"](?:carousel|recommended-products|related-products|quem-comprou-comprou-tambem)[\'"]/i',
+            '/id=[\'"](?:carousel|recommendations|related-products)[\'"]/i',
+        ];
+
+        foreach ($cutPatterns as $cutPattern) {
+            $parts = preg_split($cutPattern, $html);
+            if (! empty($parts[0]) && strlen($parts[0]) > 1000) {
+                return $parts[0];
+            }
+        }
+
+        return $html;
     }
 }

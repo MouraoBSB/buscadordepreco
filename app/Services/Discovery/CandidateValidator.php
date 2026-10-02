@@ -21,6 +21,11 @@ class CandidateValidator
             return CandidateValidationResult::reject('URL é página de busca ou listagem de categoria, não anúncio individual de produto.');
         }
 
+        // 0.1 Filter out clearly Out-of-Stock results from search snippets/titles
+        if (preg_match('/\b(esgotado|indispon[íi]vel|sem\s+estoque|fora\s+de\s+estoque|avise-me\s+quando\s+chegar)\b/iu', $text)) {
+            return CandidateValidationResult::reject('Anúncio identificado como esgotado ou indisponível.');
+        }
+
         // 1. Core Subject Relevance Check (must match brand, model, or identifying commercial keywords)
         if (! $this->hasRelevantProductTerms($product, $text)) {
             return CandidateValidationResult::reject('Título do anúncio não possui correspondência com o produto monitorado (marca ou termos principais ausentes).');
@@ -198,6 +203,15 @@ class CandidateValidator
         if (count($parts) > 1) {
             $prefixClean = preg_replace('/[^A-Za-z0-9]/', '', mb_strtolower($parts[0], 'UTF-8'));
             if (strlen($prefixClean) >= 5 && str_contains($textClean, $prefixClean)) {
+                return true;
+            }
+        }
+
+        // Check model family root (e.g. WA17CG from WA17CG6746BVBZ)
+        if (strlen($codeClean) >= 8) {
+            $root8 = substr($codeClean, 0, 8);
+            $root6 = substr($codeClean, 0, 6);
+            if (str_contains($textClean, $root8) || (strlen($root6) >= 6 && str_contains($textClean, $root6))) {
                 return true;
             }
         }
