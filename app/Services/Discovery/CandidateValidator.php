@@ -131,6 +131,29 @@ class CandidateValidator
             }
         }
 
+        // Check Power / Wattage (W)
+        $expectedPower = $product->hard_constraints['power_w'] ?? null;
+        if (! $expectedPower && preg_match('/\b(\d{3,5})\s*w\b/iu', $product->name, $mW)) {
+            $expectedPower = (int) $mW[1];
+        }
+        if ($expectedPower) {
+            $expInt = (int) $expectedPower;
+            if (preg_match_all('/\b(\d{3,5})\s*(?:w|watts|watt)\b/ui', $text, $wMatches)) {
+                $foundPowers = array_map('intval', $wMatches[1]);
+                $hasMatchingPower = in_array($expInt, $foundPowers, true);
+
+                if (! $hasMatchingPower && count($foundPowers) > 0) {
+                    $foundStr = implode('W, ', $foundPowers).'W';
+
+                    return CandidateValidationResult::reject("Potência incompatível: anúncio menciona {$foundStr}, mas o produto monitorado é de {$expInt}W.");
+                }
+
+                if ($hasMatchingPower) {
+                    $matches['power_confirmed'] = true;
+                }
+            }
+        }
+
         // 3. Strict Model Code Check (if enabled by user)
         $modelCode = $product->model_code;
         if ($modelCode) {
@@ -152,11 +175,25 @@ class CandidateValidator
             }
         }
 
-        // 5. Brand Check
+        // 5. Brand Check & Conflicting Brand Detection
         if ($product->brand) {
             $brandLower = mb_strtolower($product->brand, 'UTF-8');
             if (str_contains($text, $brandLower) || str_contains(mb_strtolower($candidate->getDomain(), 'UTF-8'), $brandLower)) {
                 $matches['brand_matched'] = true;
+            } else {
+                // If candidate title mentions a different known competing brand, reject as brand conflict
+                $competingBrands = [
+                    'midea', 'panasonic', 'samsung', 'lg', 'apple', 'sony', 'nintendo',
+                    'electrolux', 'brastemp', 'consul', 'dell', 'asus', 'lenovo', 'xiaomi',
+                    'tcl', 'philips', 'jbl', 'motorola', 'acer', 'britânia', 'mondial',
+                    'arno', 'philco', 'oster', 'cadence', 'walita', 'zurbe', 'ouxi', 'panda',
+                    'engwe', 'nexor', 'caloi', 'sense', 'ogawa',
+                ];
+                foreach ($competingBrands as $cb) {
+                    if ($cb !== $brandLower && preg_match('/\b'.preg_quote($cb, '/').'\b/iu', $candidate->title)) {
+                        return CandidateValidationResult::reject("Marca incompatível: anúncio pertence à marca '".ucfirst($cb)."', esperado '".ucfirst($product->brand)."'.");
+                    }
+                }
             }
         }
 
@@ -170,6 +207,36 @@ class CandidateValidator
     }
 
     /**
+     * Stop words and generic category words that cannot distinguish a product.
+     */
+    protected array $genericStopWords = [
+        'de', 'da', 'do', 'das', 'dos', 'em', 'no', 'na', 'nos', 'nas',
+        'para', 'com', 'sem', 'por', 'um', 'uma', 'uns', 'umas', 'sob', 'sobre',
+        'bivolt', '220v', '127v', '110v', 'volts', 'volt', 'litros', 'quilos', 'polegadas', 'pol', 'cor',
+        'bicicleta', 'bike', 'ebike', 'bicicletas', 'bikes',
+        'lavadora', 'maquina', 'máquina', 'lava', 'seca', 'secadora', 'lavadoras',
+        'geladeira', 'refrigerador', 'freezer', 'geladeiras',
+        'fogao', 'fogão', 'cooktop', 'forno', 'microondas', 'micro-ondas',
+        'tv', 'smart', 'televisao', 'televisão', 'televisor', 'televisores',
+        'celular', 'smartphone', 'celulares', 'smartphones', 'telefone',
+        'notebook', 'laptop', 'computador', 'pc', 'desktop',
+        'tablet', 'tablets', 'smartwatch', 'relogio', 'relógio',
+        'fone', 'headphone', 'headset', 'earphone', 'fones',
+        'caixa', 'soundbar', 'speaker', 'som',
+        'aspirador', 'ventilador', 'ar', 'condicionado', 'climatizador',
+        'fritadeira', 'airfryer', 'panela',
+        'console', 'videogame', 'video-game',
+        'patinete', 'scooter', 'moto', 'motocicleta',
+        'eletrica', 'elétrica', 'eletrico', 'elétrico', 'digital', 'automatico', 'automática',
+        'portatil', 'portátil', 'gamer', 'inteligente', 'wireless', 'bluetooth',
+        'turbo', 'inverter', 'inox', 'titanium', 'titânio', 'preto', 'branco', 'cinza', 'prata',
+        'novo', 'nova', 'novos', 'novas', 'original', 'oficial', 'promocao', 'promoção',
+        'oferta', 'barato', 'frete', 'gratis', 'grátis', 'pronta', 'entrega', 'garantia',
+        'alta', 'potencia', 'potência', 'forte', 'grande', 'pequeno', 'medio', 'médio',
+        'pro', 'plus', 'max', 'ultra', 'mini', 'lite',
+    ];
+
+    /**
      * Check if the candidate text contains at least one significant identifying keyword of the product.
      */
     protected function hasRelevantProductTerms(Product $product, string $text): bool
@@ -179,14 +246,15 @@ class CandidateValidator
             return true;
         }
 
-        // 2. Check significant product tokens (e.g. 'switch', 'oled', 'ecobubble')
+        // 2. Check significant distinctive product tokens (e.g. 'gt73pro3000w', 'ecobubble', 'oled')
         $matchedTokens = $this->getMatchedProductTokens($product, $text);
         if (! empty($matchedTokens)) {
             return true;
         }
 
-        // 3. If brand is present, check if brand is explicitly mentioned
-        if ($product->brand) {
+        // 3. If brand is present, check brand ONLY IF no distinctive tokens exist on product
+        $productDistinctiveTokens = $this->extractDistinctiveProductTokens($product);
+        if ($product->brand && empty($productDistinctiveTokens)) {
             $brandLower = mb_strtolower($product->brand, 'UTF-8');
             if (str_contains($text, $brandLower)) {
                 return true;
@@ -197,9 +265,9 @@ class CandidateValidator
     }
 
     /**
-     * Extract significant identifying tokens from product name/commercial name.
+     * Extract distinctive tokens belonging to the product (excluding brand, model code, category words and stop words).
      */
-    public function getMatchedProductTokens(Product $product, string $text): array
+    public function extractDistinctiveProductTokens(Product $product): array
     {
         $nameToExtract = $product->commercial_name ?: $product->name;
         if ($product->brand) {
@@ -209,20 +277,22 @@ class CandidateValidator
             $nameToExtract = str_ireplace($product->model_code, '', $nameToExtract);
         }
 
-        $stopWords = [
-            'de', 'da', 'do', 'das', 'dos', 'em', 'no', 'na', 'nos', 'nas',
-            'para', 'com', 'sem', 'por', 'um', 'uma', 'uns', 'umas',
-            'bivolt', '220v', '127v', '110v', 'volts', 'volt',
-            'novo', 'nova', 'original', 'oficial', 'litros', 'quilos', 'polegadas', 'cor',
-        ];
-
         $tokens = preg_split('/[\s,\.\-\/\+]+/', mb_strtolower($nameToExtract, 'UTF-8'));
-        $significant = array_values(array_filter($tokens, function ($t) use ($stopWords) {
-            return mb_strlen($t) >= 3 && ! in_array($t, $stopWords, true);
+
+        return array_values(array_filter($tokens, function ($t) {
+            return mb_strlen($t) >= 3 && ! in_array($t, $this->genericStopWords, true);
         }));
+    }
+
+    /**
+     * Extract significant identifying tokens from candidate text.
+     */
+    public function getMatchedProductTokens(Product $product, string $text): array
+    {
+        $distinctive = $this->extractDistinctiveProductTokens($product);
 
         $matched = [];
-        foreach ($significant as $token) {
+        foreach ($distinctive as $token) {
             if (str_contains($text, $token)) {
                 $matched[] = $token;
             }

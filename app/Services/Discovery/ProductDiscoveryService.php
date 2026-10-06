@@ -7,6 +7,7 @@ use App\Models\DiscoveryRun;
 use App\Models\Product;
 use App\Models\ProductSource;
 use App\Models\Store;
+use App\Services\Collector\Pipeline\CollectionPipeline;
 use App\Services\Discovery\Contracts\DiscoveryProviderInterface;
 use App\Services\Discovery\DTOs\RawCandidateDto;
 use App\Services\Discovery\Providers\DirectStoreDiscoveryProvider;
@@ -260,7 +261,7 @@ class ProductDiscoveryService
                                 'store_id' => $store?->id,
                                 'collector_type' => 'generic_jsonld',
                                 'expected_model' => $product->model_code,
-                                'expected_voltage' => $product->voltage,
+                                'expected_voltage' => $product->voltage ?: 'Bivolt',
                                 'active' => true,
                                 'status' => 'active',
                                 'priority' => 10,
@@ -276,9 +277,9 @@ class ProductDiscoveryService
                         if ($source->wasRecentlyCreated) {
                             dispatch(function () use ($source) {
                                 try {
-                                    app(\App\Services\Collector\Pipeline\CollectionPipeline::class)->run($source);
+                                    app(CollectionPipeline::class)->run($source);
                                 } catch (\Throwable $e) {
-                                    \Illuminate\Support\Facades\Log::warning("Immediate collection failed for auto-approved source {$source->id}: {$e->getMessage()}");
+                                    Log::warning("Immediate collection failed for auto-approved source {$source->id}: {$e->getMessage()}");
                                 }
                             })->afterResponse();
                         }

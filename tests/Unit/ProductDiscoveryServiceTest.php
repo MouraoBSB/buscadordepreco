@@ -109,7 +109,7 @@ class ProductDiscoveryServiceTest extends TestCase
 
         $sharedUrl = 'https://www.magazineluiza.com.br/lavadora-midea-165kg-ma512w165-220v/p/12345/';
 
-        $provider1 = (new MockDiscoveryProvider)->setMockCandidates([
+        $provider1 = (new MockDiscoveryProvider('direct_store'))->setMockCandidates([
             new RawCandidateDto(
                 url: $sharedUrl,
                 title: 'Lavadora Midea 16,5kg MA512W165 220V',
@@ -119,7 +119,7 @@ class ProductDiscoveryServiceTest extends TestCase
         ]);
 
         // Provider 2 finds the exact same URL
-        $provider2 = (new MockDiscoveryProvider)->setMockCandidates([
+        $provider2 = (new MockDiscoveryProvider('tavily'))->setMockCandidates([
             new RawCandidateDto(
                 url: $sharedUrl,
                 title: 'Lavadora Midea 16,5kg MA512W165 220V',
@@ -148,6 +148,68 @@ class ProductDiscoveryServiceTest extends TestCase
         $this->assertCount(2, $candidate->metadata['providers']);
 
         // Assert provider_stats recorded in run
-        $this->assertArrayHasKey('mock', $result['provider_stats']);
+        $this->assertArrayHasKey('tavily', $result['provider_stats']);
+        $this->assertArrayHasKey('direct_store', $result['provider_stats']);
+    }
+
+    public function test_rejects_generic_category_bike_mismatch_and_approves_exact_model(): void
+    {
+        $product = Product::create([
+            'name' => 'Bicicleta Bike Eletrica Gt73pro3000w',
+            'commercial_name' => 'Bike Eletrica Gt73pro3000w',
+            'brand' => null,
+            'model_code' => 'Gt73pro3000w',
+            'hard_constraints' => ['power_w' => 3000],
+            'forbidden_terms' => ['1000w', '1000 watts', 'peça', 'usado'],
+            'strict_model' => false,
+        ]);
+
+        $mockCandidates = [
+            // Candidate 1: Zurbe S20 Pro 1000W -> totally different model and wattage, MUST BE REJECTED
+            new RawCandidateDto(
+                url: 'https://www.mercadolivre.com.br/zurbe-bicicleta-eletrica-nfc-1000w-s20-pro-bateria-litio-48v/up/MLBU5241198818',
+                title: 'Zurbe Bicicleta Elétrica Nfc 1000w S20 Pro Bateria Lítio 48v',
+                snippet: 'Zurbe S20 Pro motor 1000W 48V',
+                provider: 'tavily'
+            ),
+            // Candidate 2: Exact matching GT73 Pro 3000W -> MUST BE AUTO-APPROVED
+            new RawCandidateDto(
+                url: 'https://www.mercadolivre.com.br/bicicleta-bike-eletrica-gt73pro3000w-140km-freio-hidraulico/up/MLBU4354324769',
+                title: 'Bicicleta Bike Eletrica Gt73pro3000w 140km Freio Hidraulico | Parcelamento sem juros',
+                snippet: 'Bike eletrica modelo Gt73pro3000w motor 3000W freio hidraulico',
+                provider: 'tavily'
+            ),
+        ];
+
+        $mockProvider = (new MockDiscoveryProvider('tavily'))->setMockCandidates($mockCandidates);
+
+        $validator = new CandidateValidator;
+        $scorer = new CandidateScorer;
+        $profiler = new ProductEnrichmentService;
+
+        $service = new ProductDiscoveryService($validator, $scorer, $profiler);
+        $service->setProviders([$mockProvider]);
+
+        $result = $service->discoverForProduct($product, ['bicicleta eletrica gt73pro3000w']);
+
+        $this->assertEquals(2, $result['candidates_found']);
+        $this->assertEquals(1, $result['candidates_auto_approved']);
+        $this->assertEquals(1, $result['candidates_rejected']);
+
+        // Check Zurbe is rejected
+        $zurbe = DiscoveryCandidate::where('product_id', $product->id)
+            ->where('url', 'like', '%zurbe%')
+            ->first();
+        $this->assertNotNull($zurbe);
+        $this->assertEquals('rejected', $zurbe->status);
+        $this->assertNull($zurbe->product_source_id);
+
+        // Check GT73 is auto-approved
+        $gt73 = DiscoveryCandidate::where('product_id', $product->id)
+            ->where('url', 'like', '%gt73pro%')
+            ->first();
+        $this->assertNotNull($gt73);
+        $this->assertEquals('auto_approved', $gt73->status);
+        $this->assertNotNull($gt73->product_source_id);
     }
 }

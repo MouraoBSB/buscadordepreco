@@ -8,6 +8,8 @@ use App\Services\Discovery\DTOs\RawCandidateDto;
 
 class MockDiscoveryProvider implements DiscoveryProviderInterface
 {
+    public function __construct(protected string $name = 'mock') {}
+
     /**
      * @var array<RawCandidateDto>
      */
@@ -15,7 +17,7 @@ class MockDiscoveryProvider implements DiscoveryProviderInterface
 
     public function getName(): string
     {
-        return 'mock';
+        return $this->name;
     }
 
     public function isAvailable(): bool

@@ -55,7 +55,13 @@ class CandidateScorer
             $score += $nameWeight;
             $breakdown['name_keywords_matched'] = $nameWeight;
         } else {
-            $breakdown['name_keywords_matched'] = 0;
+            // If model code matched completely, commercial name was absorbed by model
+            if (! empty($validation->matches['model_code_matched'])) {
+                $score += $nameWeight;
+                $breakdown['name_keywords_matched'] = $nameWeight;
+            } else {
+                $breakdown['name_keywords_matched'] = 0;
+            }
         }
 
         // 3. Brand Match (+15 pts with model, +25 pts without model)
@@ -65,7 +71,13 @@ class CandidateScorer
             $score += $brandWeight;
             $breakdown['brand_matched'] = $brandWeight;
         } else {
-            $breakdown['brand_matched'] = 0;
+            // If product has no defined brand, and exact model code matched, award brand points
+            if (empty($product->brand) && ! empty($validation->matches['model_code_matched'])) {
+                $score += $brandWeight;
+                $breakdown['brand_matched'] = $brandWeight;
+            } else {
+                $breakdown['brand_matched'] = 0;
+            }
         }
 
         // 4. Hard Constraints / Required Terms (+20 pts with model, +15 pts without model)
@@ -94,6 +106,13 @@ class CandidateScorer
             }
         }
 
+        if (isset($product->hard_constraints['power_w'])) {
+            $totalConstraints++;
+            if (! empty($validation->matches['power_confirmed'])) {
+                $matchedConstraints++;
+            }
+        }
+
         if ($totalConstraints > 0) {
             $pts = (int) round(($matchedConstraints / $totalConstraints) * $constraintsWeight);
             $score += $pts;
@@ -117,11 +136,27 @@ class CandidateScorer
             $breakdown['valid_product_url'] = 0;
         }
 
+        // Auto-approval safety lock: A candidate CANNOT be auto-approved unless
+        // model code was matched, OR brand was matched AND at least 2 distinctive tokens matched!
+        $isIdentityConfirmed = ! empty($validation->matches['model_code_matched'])
+            || (! empty($validation->matches['brand_matched']) && $nameKeywordsCount >= 2);
+
+        // When no hard constraints exist, revoke free constraint points if identity is unconfirmed
+        if ($totalConstraints === 0 && ! $isIdentityConfirmed && isset($breakdown['hard_constraints_matched'])) {
+            $score -= $breakdown['hard_constraints_matched'];
+            $breakdown['hard_constraints_matched'] = 0;
+        }
+
+        // If neither brand nor model code was matched, cap the score at 55% (rejected)
+        if (empty($validation->matches['model_code_matched']) && empty($validation->matches['brand_matched'])) {
+            $score = min(55, $score);
+        }
+
         $score = min(100, max(0, $score));
 
         // Status classification
         $status = match (true) {
-            $score >= 85 => 'auto_approved',
+            $score >= 85 && $isIdentityConfirmed => 'auto_approved',
             $score >= 60 => 'pending_review',
             default => 'rejected',
         };

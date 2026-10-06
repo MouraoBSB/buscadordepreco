@@ -44,6 +44,11 @@ class ProductEnrichmentService
             $hardConstraints['screen_size'] = $screenSize;
         }
 
+        $wattage = $this->detectWattage($inputLower);
+        if ($wattage !== null) {
+            $hardConstraints['power_w'] = $wattage;
+        }
+
         $ramStorage = $this->detectRamStorage($inputLower);
         if (! empty($ramStorage)) {
             $hardConstraints = array_merge($hardConstraints, $ramStorage);
@@ -87,6 +92,9 @@ class ProductEnrichmentService
         if ($capacity) {
             $requiredTerms[] = str_replace('.', ',', (string) $capacity).'kg';
         }
+        if ($wattage) {
+            $requiredTerms[] = $wattage.'W';
+        }
 
         $forbiddenTerms = $this->generateContextualForbiddenTerms($inputLower, $hardConstraints);
 
@@ -118,6 +126,24 @@ class ProductEnrichmentService
         return $dto;
     }
 
+    public array $categoryStopWords = [
+        'bicicleta', 'bike', 'ebike', 'bicicletas', 'bikes',
+        'lavadora', 'maquina', 'máquina', 'lava', 'seca', 'secadora', 'lavadoras',
+        'geladeira', 'refrigerador', 'freezer', 'geladeiras',
+        'fogao', 'fogão', 'cooktop', 'forno', 'microondas', 'micro-ondas',
+        'tv', 'smart', 'televisao', 'televisão', 'televisor', 'televisores',
+        'celular', 'smartphone', 'celulares', 'smartphones', 'telefone',
+        'notebook', 'laptop', 'computador', 'pc', 'desktop',
+        'tablet', 'tablets', 'smartwatch', 'relogio', 'relógio',
+        'fone', 'headphone', 'headset', 'earphone', 'fones',
+        'caixa', 'soundbar', 'speaker', 'som',
+        'aspirador', 'ventilador', 'ar', 'condicionado', 'climatizador',
+        'fritadeira', 'airfryer', 'panela',
+        'console', 'videogame', 'video-game',
+        'patinete', 'scooter', 'moto', 'motocicleta',
+        'eletrica', 'elétrica', 'eletrico', 'elétrico',
+    ];
+
     /**
      * Detect brand from known list or first significant word.
      */
@@ -130,11 +156,48 @@ class ProductEnrichmentService
         }
 
         $words = array_values(array_filter(explode(' ', trim($input))));
-        if (! empty($words)) {
-            $firstWord = $words[0];
-            $stopWords = ['o', 'a', 'os', 'as', 'um', 'uma', 'de', 'do', 'da', 'com', 'sem', 'para', 'em', 'no', 'na', 'the'];
-            if (mb_strlen($firstWord) >= 3 && ! in_array(mb_strtolower($firstWord), $stopWords, true)) {
-                return ucfirst(mb_strtolower($firstWord, 'UTF-8'));
+        $stopWords = ['o', 'a', 'os', 'as', 'um', 'uma', 'de', 'do', 'da', 'com', 'sem', 'para', 'em', 'no', 'na', 'the'];
+
+        foreach ($words as $word) {
+            $wordLower = mb_strtolower($word, 'UTF-8');
+            if (mb_strlen($word) < 3) {
+                continue;
+            }
+            if (in_array($wordLower, $stopWords, true) || in_array($wordLower, $this->categoryStopWords, true)) {
+                continue;
+            }
+            // Model codes with numbers are not brands
+            if (preg_match('/\d/', $word)) {
+                continue;
+            }
+            // Generic commercial words
+            if (in_array($wordLower, ['novo', 'nova', 'original', 'oficial', 'bivolt', 'pro', 'max', 'plus', 'ultra', 'mini', 'lite', 'comprar'], true)) {
+                continue;
+            }
+
+            return ucfirst($wordLower);
+        }
+
+        return null;
+    }
+
+    /**
+     * Detect power / wattage in Watts.
+     */
+    protected function detectWattage(string $inputLower): ?int
+    {
+        if (preg_match('/\b(\d{2,5})\s*(?:w|watts|watt)\b/iu', $inputLower, $m)) {
+            $val = (int) $m[1];
+            if ($val >= 50 && $val <= 15000 && ! in_array($val, [110, 127, 220], true)) {
+                return $val;
+            }
+        }
+
+        // Attached pattern like gt73pro3000w
+        if (preg_match('/(?:pro|max|plus|gt|[a-z])(\d{3,4})w\b/iu', $inputLower, $m)) {
+            $val = (int) $m[1];
+            if ($val >= 50 && $val <= 15000 && ! in_array($val, [110, 127, 220], true)) {
+                return $val;
             }
         }
 
@@ -204,11 +267,18 @@ class ProductEnrichmentService
      */
     protected function detectModelCode(string $input, ?string $brand): ?string
     {
-        // Patterns like MA512W165/GK-05, NA-F180P7, WA17CG6746BVBZ, OLED55C4PSA, etc.
-        if (preg_match('/\b([A-Z0-9]{3,}-[A-Z0-9\/]+|[A-Z]{2,}\d{2,}[A-Z0-9\/]*|[A-Z]{1,2}\d{3,}[A-Z0-9\/]*)\b/', $input, $m)) {
+        // 1. Slashed or hyphenated models (e.g. MA512W165/GK-05, NA-F180P7, WA17CG6746BVBZ, OLED55C4PSA)
+        if (preg_match('/\b([A-Za-z0-9]{2,}[\-\/][A-Za-z0-9\-\/]+)\b/u', $input, $m)) {
             $candidate = $m[1];
-            // Filter out common false positives like 220V, 127V, 16KG, OLED, 55POL
             if (! preg_match('/^(220V|127V|110V|16KG|17KG|18KG|OLED|QLED|BIVOLT)$/i', $candidate)) {
+                return $candidate;
+            }
+        }
+
+        // 2. Alphanumeric model codes like Gt73pro3000w, GT73, S20, V10, FT03, R02, WA17CG6746BVBZ
+        if (preg_match('/\b([A-Za-z]{1,4}\d{1,4}[A-Za-z0-9\-\/]*|[A-Za-z0-9]{2,}\d{2,}[A-Za-z0-9\-\/]*)\b/u', $input, $m)) {
+            $candidate = $m[1];
+            if (! preg_match('/^(220V|127V|110V|16KG|17KG|18KG|OLED|QLED|BIVOLT|\d+W|\d+KG|\d+POL|\d+V)$/i', $candidate)) {
                 return $candidate;
             }
         }
@@ -221,6 +291,9 @@ class ProductEnrichmentService
      */
     protected function detectCategory(string $inputLower): string
     {
+        if (preg_match('/(bicicleta|bike|ebike|scooter|patinete|moto\s*elétrica)/i', $inputLower)) {
+            return 'Mobilidade Elétrica';
+        }
         if (preg_match('/(lavadora|lava\s*e\s*seca|máquina\s*de\s*lavar)/i', $inputLower)) {
             return 'Lavadoras & Secadoras';
         }
@@ -296,6 +369,18 @@ class ProductEnrichmentService
             }
         }
 
+        // 3.1 Power / Wattage contradiction
+        if (isset($hardConstraints['power_w'])) {
+            $expectedW = (int) $hardConstraints['power_w'];
+            $commonW = [250, 350, 500, 750, 800, 1000, 1200, 1500, 2000, 3000, 5000];
+            foreach ($commonW as $cw) {
+                if ($cw !== $expectedW) {
+                    $forbidden[] = $cw.'w';
+                    $forbidden[] = $cw.' watts';
+                }
+            }
+        }
+
         // 4. Parts / Accessories context check
         // Check if user INTENTIONALLY asked for parts or accessories
         $isSearchingParts = preg_match('/\b(peça|peças|placa|placas|suporte|capa|filtro|acessório|válvula|mangueira|trava|correia|bomba)\b/i', $inputLower);
@@ -344,6 +429,9 @@ class ProductEnrichmentService
         }
         if (isset($hardConstraints['screen_size'])) {
             $keyConstraint .= ' '.$hardConstraints['screen_size'];
+        }
+        if (isset($hardConstraints['power_w'])) {
+            $keyConstraint .= ' '.$hardConstraints['power_w'].'W';
         }
         if ($keyConstraint) {
             $queries[] = trim(($brand ? $brand.' ' : '').$commercialName.$keyConstraint);

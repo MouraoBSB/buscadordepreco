@@ -12,7 +12,7 @@ class ProductEnrichmentServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->profiler = new ProductEnrichmentService();
+        $this->profiler = new ProductEnrichmentService;
     }
 
     public function test_profiles_tv_in_natural_language(): void
@@ -63,5 +63,23 @@ class ProductEnrichmentServiceTest extends TestCase
 
         // Since the user is searching for used ("usado"), "usado" must NOT be in forbidden terms!
         $this->assertNotContains('usado', $dto->forbiddenTerms);
+    }
+
+    public function test_profiles_electric_bike_without_false_brand_and_with_power_constraint(): void
+    {
+        $dto = $this->profiler->profileFromText('Bicicleta Bike Eletrica Gt73pro3000w');
+
+        // Brand must NOT be detected as "Bicicleta" or "Bike"
+        $this->assertNotEquals('Bicicleta', $dto->brand);
+        $this->assertNotEquals('Bike', $dto->brand);
+
+        // Model code and power correctly extracted
+        $this->assertEquals('Gt73pro3000w', $dto->modelCode);
+        $this->assertEquals(3000, $dto->hardConstraints['power_w'] ?? null);
+        $this->assertEquals('Mobilidade Elétrica', $dto->category);
+
+        // Conflicting powers forbidden
+        $this->assertContains('1000w', $dto->forbiddenTerms);
+        $this->assertContains('750w', $dto->forbiddenTerms);
     }
 }
