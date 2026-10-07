@@ -40,6 +40,7 @@ return [
         'user' => env('GOWA_USER', 'admin'),
         'password' => env('GOWA_PASSWORD'),
         'recipient_phone' => env('GOWA_RECIPIENT_PHONE'),
+        'webhook_secret' => env('GOWA_WEBHOOK_SECRET', 'pricewatch-secret-gowa-2026'),
     ],
 
     'tavily' => [

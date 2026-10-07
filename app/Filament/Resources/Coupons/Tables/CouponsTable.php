@@ -70,12 +70,14 @@ class CouponsTable
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
                         'manual' => 'primary',
-                        'auto_detected' => 'success',
+                        'auto_detected' => 'info',
+                        'whatsapp_group' => 'success',
                         default => 'gray',
                     })
                     ->formatStateUsing(fn (string $state): string => match ($state) {
                         'manual' => 'Manual',
                         'auto_detected' => 'Auto-detectado',
+                        'whatsapp_group' => 'Grupo WhatsApp',
                         default => $state,
                     }),
 

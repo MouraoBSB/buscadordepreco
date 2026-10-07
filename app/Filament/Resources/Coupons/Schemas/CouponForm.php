@@ -79,6 +79,7 @@ class CouponForm
                     ->options([
                         'manual' => 'Cadastrado Manualmente',
                         'auto_detected' => 'Detectado pelo Coletor',
+                        'whatsapp_group' => 'Grupo de Ofertas (WhatsApp)',
                     ])
                     ->default('manual')
                     ->required(),
