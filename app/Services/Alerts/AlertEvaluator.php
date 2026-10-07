@@ -6,8 +6,11 @@ use App\Models\Alert;
 use App\Models\AlertRule;
 use App\Models\PriceObservation;
 use App\Models\Product;
+use App\Models\User;
 use App\Services\Alerts\Channels\GoWaChannel;
 use Carbon\Carbon;
+use Filament\Actions\Action;
+use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Log;
 
 class AlertEvaluator
@@ -132,16 +135,36 @@ class AlertEvaluator
         $storeName = $source->store ? $source->store->name : 'Loja';
         $seller = $observation->seller ?: $storeName;
 
-        $pixText = $observation->pix_price ? ' (no Pix)' : '';
-        $installments = $observation->installment_price && $observation->installment_count
-            ? " ou {$observation->installment_count}x de R$ ".number_format((float) $observation->installment_price, 2, ',', '.')
-            : '';
+        // 3 price scenarios
+        $regularFormatted = $observation->regular_price ? 'R$ '.number_format((float) $observation->regular_price, 2, ',', '.') : 'N/D';
+        if ($observation->installment_price && $observation->installment_count) {
+            $regularFormatted .= " ({$observation->installment_count}x de R$ ".number_format((float) $observation->installment_price, 2, ',', '.').')';
+        }
+
+        $pixFormatted = $observation->pix_price ? 'R$ '.number_format((float) $observation->pix_price, 2, ',', '.') : null;
+        $couponFormatted = $observation->coupon_price ? 'R$ '.number_format((float) $observation->coupon_price, 2, ',', '.') : null;
+
+        $priceScenariosText = "💳 *Cartão/Parcelado:* {$regularFormatted}\n";
+        if ($pixFormatted) {
+            $priceScenariosText .= "⚡ *À Vista no Pix:* {$pixFormatted}\n";
+        }
+        if ($couponFormatted && $observation->coupon_code) {
+            $discountText = $observation->coupon_discount ? ' (Economia de R$ '.number_format((float) $observation->coupon_discount, 2, ',', '.').')' : '';
+            $priceScenariosText .= "🎟️ *Com Cupom:* {$couponFormatted}{$discountText}\n"
+                ."🏷️ *Código do Cupom:* `{$observation->coupon_code}`\n";
+        }
+
+        $prodName = $product->commercial_name ?: $product->name;
+        $voltageText = $product->voltage ? " | Tensão: *{$product->voltage}*" : '';
+        $modelText = $product->model_code ? "📌 Modelo: `{$product->model_code}`{$voltageText}\n\n" : '';
 
         $message = "🚨 *ALERTA PRICEWATCH*\n\n"
-            ."*{$product->name}*\n"
-            ."📌 Modelo: `{$product->model_code}` | Tensão: *{$product->voltage}*\n\n"
+            ."*{$prodName}*\n"
+            .$modelText
             ."{$reason}\n\n"
-            .'💰 *Valor: R$ '.number_format($price, 2, ',', '.')."*{$pixText}{$installments}\n"
+            ."📊 *Cenários de Preço:*\n"
+            .$priceScenariosText."\n"
+            .'💰 *Melhor Preço Final: R$ '.number_format($price, 2, ',', '.')."*\n"
             ."🏪 Loja: *{$storeName}* (Vendido por: {$seller})\n"
             ."🔗 Link da Oferta:\n{$source->url}\n\n"
             .'⏰ Coletado em: '.Carbon::parse($observation->collected_at)->format('d/m/Y H:i');
@@ -156,10 +179,14 @@ class AlertEvaluator
                 'message' => $message,
                 'reason' => $reason,
                 'url' => $source->url,
+                'regular_price' => $observation->regular_price,
+                'pix_price' => $observation->pix_price,
+                'coupon_price' => $observation->coupon_price,
+                'coupon_code' => $observation->coupon_code,
             ],
         ]);
 
-        // Send via GoWA
+        // 1. Send via GoWA (WhatsApp)
         $result = $this->goWaChannel->sendMessage($message);
 
         if ($result['ok']) {
@@ -172,6 +199,28 @@ class AlertEvaluator
                 'status' => 'failed',
                 'error_message' => $result['error'] ?? 'Erro desconhecido ao enviar pelo GoWA',
             ]);
+        }
+
+        // 2. Send via Filament Database Notification (Web Dashboard)
+        try {
+            $users = User::all();
+            if ($users->isNotEmpty()) {
+                Notification::make()
+                    ->title("Alerta: {$prodName}")
+                    ->body("{$reason} • Melhor valor: R$ ".number_format($price, 2, ',', '.').($observation->coupon_code ? " [Cupom: {$observation->coupon_code}]" : ''))
+                    ->icon('heroicon-o-bell-alert')
+                    ->iconColor('success')
+                    ->actions([
+                        Action::make('view_offer')
+                            ->button()
+                            ->label('Ver Oferta')
+                            ->url($source->url)
+                            ->openUrlInNewTab(),
+                    ])
+                    ->sendToDatabase($users);
+            }
+        } catch (\Throwable $e) {
+            Log::warning("Erro ao enviar notificação interna do painel: {$e->getMessage()}");
         }
     }
 }

@@ -20,7 +20,7 @@ class ProductImageService
         }
 
         $query = $productOrQuery instanceof Product
-            ? trim(($productOrQuery->brand ? $productOrQuery->brand . ' ' : '') . ($productOrQuery->commercial_name ?: $productOrQuery->name))
+            ? trim(($productOrQuery->brand ? $productOrQuery->brand.' ' : '').($productOrQuery->commercial_name ?: $productOrQuery->name))
             : trim($productOrQuery);
 
         if (empty($query)) {
@@ -36,7 +36,7 @@ class ProductImageService
                 ->timeout(10)
                 ->post('https://api.tavily.com/search', [
                     'api_key' => $apiKey,
-                    'query' => $query . ' produto oficial foto',
+                    'query' => $query.' produto oficial foto',
                     'include_images' => true,
                     'max_results' => 3,
                 ]);
@@ -64,7 +64,7 @@ class ProductImageService
                 }
             }
         } catch (\Throwable $e) {
-            Log::error("ProductImageService failed to fetch image for '{$query}': " . $e->getMessage());
+            Log::error("ProductImageService failed to fetch image for '{$query}': ".$e->getMessage());
         }
 
         return null;
@@ -83,6 +83,7 @@ class ProductImageService
         if ($imageUrl) {
             $product->update(['image_url' => $imageUrl]);
             Log::info("ProductImageService: Assigned automatic image to product #{$product->id} ({$product->name}): {$imageUrl}");
+
             return $imageUrl;
         }
 

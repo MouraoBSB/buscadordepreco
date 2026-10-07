@@ -8,6 +8,7 @@ use Illuminate\Console\Command;
 class TestAlertCommand extends Command
 {
     protected $signature = 'pricewatch:test-alert {phone?}';
+
     protected $description = 'Envia um alerta de teste via GoWA para validar a integração com WhatsApp';
 
     public function handle(GoWaChannel $channel): int
@@ -18,7 +19,7 @@ class TestAlertCommand extends Command
         $msg = "🚨 *PriceWatch*: Teste de conectividade com sucesso!\n"
             ."Sistema de monitoramento e alertas ativo em produção:\n"
             ."🔗 https://buscador.mgnexus.com.br\n"
-            ."⏰ Horário: ".now()->format('d/m/Y H:i:s');
+            .'⏰ Horário: '.now()->format('d/m/Y H:i:s');
 
         $result = $channel->sendMessage($msg, $phone);
 

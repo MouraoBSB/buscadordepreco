@@ -20,5 +20,3 @@ Schedule::command('pricewatch:discover')
     ->at('09:00')
     ->withoutOverlapping()
     ->runInBackground();
-
-

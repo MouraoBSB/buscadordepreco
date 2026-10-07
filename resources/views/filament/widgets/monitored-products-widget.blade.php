@@ -87,6 +87,53 @@
                                 @endif
                             </div>
                         </div>
+
+                        <!-- 3 Cenários Reais de Preço (Cartão, PIX, Cupom) -->
+                        @if ($product['current_price'])
+                            <div style="margin-top: 0.75rem; background-color: #f8fafc; border-radius: 0.5rem; padding: 0.5rem 0.625rem; border: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.6875rem;" class="dark:bg-gray-800/60 dark:border-gray-800">
+                                <!-- 1. Cartão / Parcelado -->
+                                <div style="display: flex; align-items: center; justify-content: space-between; color: #475569;" class="dark:text-gray-300">
+                                    <span style="display: flex; align-items: center; gap: 0.25rem;">
+                                        <span>💳</span> <span style="color: #64748b;">Cartão:</span>
+                                    </span>
+                                    <span style="font-weight: 600;">
+                                        {{ $product['regular_price'] ? 'R$ ' . number_format($product['regular_price'], 2, ',', '.') : 'Consulte' }}
+                                        @if ($product['installments_text'])
+                                            <span style="font-size: 0.625rem; color: #94a3b8; font-weight: normal;">({{ $product['installments_text'] }})</span>
+                                        @endif
+                                    </span>
+                                </div>
+
+                                <!-- 2. À Vista no Pix -->
+                                <div style="display: flex; align-items: center; justify-content: space-between; color: #475569;" class="dark:text-gray-300">
+                                    <span style="display: flex; align-items: center; gap: 0.25rem;">
+                                        <span>⚡</span> <span style="color: #64748b;">À vista (Pix):</span>
+                                    </span>
+                                    <span style="font-weight: 600; color: {{ $product['pix_price'] ? '#0284c7' : 'inherit' }};">
+                                        {{ $product['pix_price'] ? 'R$ ' . number_format($product['pix_price'], 2, ',', '.') : ($product['regular_price'] ? 'R$ ' . number_format($product['regular_price'], 2, ',', '.') : 'Consulte') }}
+                                    </span>
+                                </div>
+
+                                <!-- 3. Com Cupom -->
+                                <div style="display: flex; align-items: center; justify-content: space-between; color: #475569;" class="dark:text-gray-300">
+                                    <span style="display: flex; align-items: center; gap: 0.25rem;">
+                                        <span>🎟️</span> <span style="color: #64748b;">Com Cupom:</span>
+                                    </span>
+                                    @if ($product['coupon_price'] && $product['coupon_code'])
+                                        <span style="font-weight: 700; color: #059669; display: flex; align-items: center; gap: 0.25rem;">
+                                            R$ {{ number_format($product['coupon_price'], 2, ',', '.') }}
+                                            <span style="font-family: monospace; font-size: 0.5625rem; padding: 0.05rem 0.25rem; background-color: #dcfce7; color: #166534; border-radius: 0.25rem; border: 1px solid #bbf7d0;">
+                                                {{ $product['coupon_code'] }}
+                                            </span>
+                                        </span>
+                                    @else
+                                        <span style="color: #94a3b8; font-size: 0.625rem;">
+                                            Sem cupom ativo
+                                        </span>
+                                    @endif
+                                </div>
+                            </div>
+                        @endif
                     </div>
 
                     <div style="margin-top: 1rem; padding-top: 0.5rem; border-top: 1px solid #f9fafb; display: flex; align-items: center; justify-content: space-between; font-size: 0.75rem; color: #6b7280;">

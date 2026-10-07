@@ -14,6 +14,10 @@ class PriceObservation extends Model
         'product_source_id',
         'regular_price',
         'pix_price',
+        'coupon_price',
+        'applied_coupon_id',
+        'coupon_code',
+        'coupon_discount',
         'shipping_price',
         'installment_price',
         'installment_count',
@@ -32,6 +36,8 @@ class PriceObservation extends Model
     protected $casts = [
         'regular_price' => 'decimal:2',
         'pix_price' => 'decimal:2',
+        'coupon_price' => 'decimal:2',
+        'coupon_discount' => 'decimal:2',
         'shipping_price' => 'decimal:2',
         'installment_price' => 'decimal:2',
         'installment_count' => 'integer',
@@ -47,15 +53,22 @@ class PriceObservation extends Model
         return $this->belongsTo(ProductSource::class, 'product_source_id');
     }
 
+    public function appliedCoupon(): BelongsTo
+    {
+        return $this->belongsTo(Coupon::class, 'applied_coupon_id');
+    }
+
     /**
-     * Get effective best price (pix price if available, otherwise regular price).
+     * Get effective best price (coupon price if lower, otherwise pix price, otherwise regular price).
      */
     public function getEffectivePriceAttribute(): ?float
     {
-        if ($this->pix_price !== null && (float) $this->pix_price > 0) {
-            return (float) $this->pix_price;
-        }
+        $prices = array_filter([
+            $this->coupon_price !== null ? (float) $this->coupon_price : null,
+            $this->pix_price !== null ? (float) $this->pix_price : null,
+            $this->regular_price !== null ? (float) $this->regular_price : null,
+        ], fn ($p) => $p !== null && $p > 0);
 
-        return $this->regular_price !== null ? (float) $this->regular_price : null;
+        return ! empty($prices) ? min($prices) : null;
     }
 }

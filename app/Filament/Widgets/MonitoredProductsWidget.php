@@ -5,6 +5,7 @@ namespace App\Filament\Widgets;
 use App\Models\PriceObservation;
 use App\Models\Product;
 use App\Services\Collector\Pipeline\CollectionPipeline;
+use App\Services\Coupons\CouponCalculatorService;
 use App\Services\Discovery\ProductDiscoveryService;
 use Filament\Notifications\Notification;
 use Filament\Widgets\Widget;
@@ -110,6 +111,42 @@ class MonitoredProductsWidget extends Widget
                 $priceSubtext = "Encontrado em {$storeName}";
             }
 
+            // Determine the winning observation for scenario details
+            $winningObs = $lowestInStockObs ?: ($lowestHistoricalObs ?: $latestObs);
+
+            $regularPrice = $winningObs?->regular_price ? (float) $winningObs->regular_price : null;
+            $installmentsText = null;
+            if ($winningObs && $winningObs->installment_price && $winningObs->installment_count) {
+                $installmentsText = "{$winningObs->installment_count}x R$ ".number_format((float) $winningObs->installment_price, 2, ',', '.');
+            }
+            $pixPrice = $winningObs?->pix_price ? (float) $winningObs->pix_price : null;
+            $couponPrice = $winningObs?->coupon_price ? (float) $winningObs->coupon_price : null;
+            $couponCode = $winningObs?->coupon_code;
+            $couponDiscount = $winningObs?->coupon_discount ? (float) $winningObs->coupon_discount : null;
+
+            // If observation did not record a coupon yet, test live against active coupons table
+            if (! $couponPrice && $winningObs && $winningObs->source) {
+                $calc = app(CouponCalculatorService::class);
+                $calculated = $calc->calculateBestCoupon($winningObs->source, $regularPrice, $pixPrice);
+                if ($calculated['coupon_price']) {
+                    $couponPrice = $calculated['coupon_price'];
+                    $couponCode = $calculated['coupon_code'];
+                    $couponDiscount = $calculated['coupon_discount'];
+                }
+            }
+
+            // If coupon is lowest price, prioritize it as current_price
+            if ($couponPrice !== null && $couponPrice > 0 && ($price === null || $couponPrice < $price)) {
+                $price = $couponPrice;
+                $priceBadge = "Cupom {$couponCode}";
+                $badgeStyle = 'background-color: #dcfce7; color: #166534; border: 1px solid #bbf7d0;';
+            }
+
+            // Fallback for candidate if no observation exists
+            if (! $winningObs && $lowestCandidate) {
+                $regularPrice = (float) $lowestCandidate->detected_price;
+            }
+
             $activeSourcesCount = $prod->sources()->where('active', true)->count();
             $isBelowTarget = $price !== null && $prod->target_price && $price <= (float) $prod->target_price;
 
@@ -129,6 +166,12 @@ class MonitoredProductsWidget extends Widget
                 'price_badge' => $priceBadge,
                 'badge_style' => $badgeStyle,
                 'price_subtext' => $priceSubtext,
+                'regular_price' => $regularPrice,
+                'installments_text' => $installmentsText,
+                'pix_price' => $pixPrice,
+                'coupon_price' => $couponPrice,
+                'coupon_code' => $couponCode,
+                'coupon_discount' => $couponDiscount,
                 'active_sources_count' => $activeSourcesCount,
                 'is_below_target' => $isBelowTarget,
             ];

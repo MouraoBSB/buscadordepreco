@@ -8,6 +8,7 @@ use App\Models\ProductSource;
 use App\Services\Alerts\AlertEvaluator;
 use App\Services\Collector\CollectorManager;
 use App\Services\Collector\PriceResult;
+use App\Services\Coupons\CouponCalculatorService;
 use Carbon\Carbon;
 use Throwable;
 
@@ -15,7 +16,8 @@ class CollectionPipeline
 {
     public function __construct(
         protected CollectorManager $collectorManager,
-        protected AlertEvaluator $alertEvaluator
+        protected AlertEvaluator $alertEvaluator,
+        protected CouponCalculatorService $couponCalculator
     ) {}
 
     /**
@@ -73,11 +75,25 @@ class CollectionPipeline
                 return $result;
             }
 
+            // Calculate best eligible coupon (from scraper detection or active coupons table)
+            $couponResult = $this->couponCalculator->calculateBestCoupon(
+                source: $source,
+                regularPrice: $result->regularPrice,
+                pixPrice: $result->pixPrice,
+                detectedCouponCode: $result->couponCode,
+                detectedCouponDiscount: $result->couponDiscount,
+                detectedDiscountType: $result->couponType ?? 'fixed'
+            );
+
             // Success: Persist immutable observation
             $observation = PriceObservation::create([
                 'product_source_id' => $source->id,
                 'regular_price' => $result->regularPrice,
                 'pix_price' => $result->pixPrice,
+                'coupon_price' => $couponResult['coupon_price'],
+                'applied_coupon_id' => $couponResult['applied_coupon_id'],
+                'coupon_code' => $couponResult['coupon_code'],
+                'coupon_discount' => $couponResult['coupon_discount'],
                 'shipping_price' => $result->shippingPrice,
                 'installment_price' => $result->installmentPrice,
                 'installment_count' => $result->installmentCount,
@@ -87,7 +103,9 @@ class CollectionPipeline
                 'raw_title' => $result->rawTitle,
                 'is_mismatch' => false,
                 'collected_at' => $startedAt,
-                'metadata' => $result->metadata,
+                'metadata' => array_merge($result->metadata, [
+                    'coupon_applied_on' => $couponResult['applied_on'],
+                ]),
             ]);
 
             $run->update([

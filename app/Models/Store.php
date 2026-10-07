@@ -25,4 +25,9 @@ class Store extends Model
     {
         return $this->hasMany(ProductSource::class);
     }
+
+    public function coupons(): HasMany
+    {
+        return $this->hasMany(Coupon::class);
+    }
 }

@@ -105,12 +105,18 @@ class GenericJsonLdCollector extends BaseCollector
             return $this->fallbackHtmlParsing($source, $html, $fetch['status'], $durationMs, $rawTitle, $inStock);
         }
 
+        $pixPrice = $this->extractPixPrice($html, $price);
+        $couponData = $this->extractCouponData($html, $source);
+
         return PriceResult::success(
             regularPrice: $price,
-            pixPrice: null, // Will be enriched if detected
+            pixPrice: $pixPrice,
             inStock: $inStock,
             rawTitle: $rawTitle,
             seller: $seller,
+            couponCode: $couponData['code'] ?? null,
+            couponDiscount: $couponData['discount'] ?? null,
+            couponType: $couponData['type'] ?? null,
             metadata: ['collector' => 'generic_jsonld', 'brand' => $productData['brand']['name'] ?? null],
             httpStatus: $fetch['status'],
             durationMs: $durationMs
@@ -193,11 +199,17 @@ class GenericJsonLdCollector extends BaseCollector
             );
         }
 
+        $pixPrice = $this->extractPixPrice($html, $price);
+        $couponData = $this->extractCouponData($html, $source);
+
         return PriceResult::success(
             regularPrice: $price,
-            pixPrice: null,
+            pixPrice: $pixPrice,
             inStock: $inStock,
             rawTitle: $detectedTitle,
+            couponCode: $couponData['code'] ?? null,
+            couponDiscount: $couponData['discount'] ?? null,
+            couponType: $couponData['type'] ?? null,
             metadata: ['collector' => 'html_fallback'],
             httpStatus: $httpStatus,
             durationMs: $durationMs
@@ -281,5 +293,117 @@ class GenericJsonLdCollector extends BaseCollector
         }
 
         return $html;
+    }
+
+    /**
+     * Extract Pix / à vista discount price if present in HTML.
+     */
+    protected function extractPixPrice(string $html, ?float $regularPrice): ?float
+    {
+        $patterns = [
+            '/(?:no\s+Pix|[àa]\s+vista\s+(?:no\s+Pix)?|no\s+boleto)\s*:?\s*R\$\s*([\d\.,]+)/iu',
+            '/R\$\s*([\d\.,]+)\s+(?:no\s+Pix|[àa]\s+vista\s+(?:no\s+Pix)?|no\s+boleto)/iu',
+            '/class=[\'"][^\'"]*(?:pix|avista|cash-price)[^\'"]*[\'"][^>]*>\s*(?:[^\d<]*)\s*R\$\s*([\d\.,]+)/iu',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $html, $m)) {
+                $pix = $this->parsePrice($m[1]);
+                if ($pix !== null && $pix > 0 && ($regularPrice === null || $pix < $regularPrice)) {
+                    return $pix;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Attempt to detect coupon code and discount from page HTML.
+     *
+     * @return array{code: string, discount: float, type: string}|null
+     */
+    protected function extractCouponData(string $html, ProductSource $source): ?array
+    {
+        $domain = parse_url($source->url, PHP_URL_HOST) ?? '';
+
+        // 1. Amazon: "Economize R$ X com este cupom" or "Economize X% com este cupom"
+        if (str_contains($domain, 'amazon.com')) {
+            if (preg_match('/economize\s+R\$\s*([\d\.,]+)\s+com\s+(?:este\s+)?cupom/iu', $html, $m)) {
+                $discount = $this->parsePrice($m[1]);
+                if ($discount && $discount > 0) {
+                    return [
+                        'code' => 'AMAZON_CUPOM',
+                        'discount' => $discount,
+                        'type' => 'fixed',
+                    ];
+                }
+            }
+            if (preg_match('/economize\s+(\d+(?:[\.,]\d+)?)\s*%\s+com\s+(?:este\s+)?cupom/iu', $html, $m)) {
+                $pct = (float) str_replace(',', '.', $m[1]);
+                if ($pct > 0 && $pct <= 80) {
+                    return [
+                        'code' => 'AMAZON_CUPOM',
+                        'discount' => $pct,
+                        'type' => 'percentage',
+                    ];
+                }
+            }
+        }
+
+        // 2. Mercado Livre
+        if (str_contains($domain, 'mercadolivre.com')) {
+            // Pattern: Cupom de R$ X OFF com código Y
+            if (preg_match('/cupom\s+(?:de\s+)?R\$\s*([\d\.,]+)(?:\s*off)?(?:\s+(?:com\s+o\s+c[oó]digo|c[oó]digo)\s+([a-z0-9_\-]+))?/iu', $html, $m)) {
+                $discount = $this->parsePrice($m[1]);
+                $code = ! empty($m[2]) ? mb_strtoupper(trim($m[2])) : 'CUPOM_ML';
+                if ($discount && $discount > 0) {
+                    return [
+                        'code' => $code,
+                        'discount' => $discount,
+                        'type' => 'fixed',
+                    ];
+                }
+            }
+            // Pattern: Cupom de X% OFF com código Y
+            if (preg_match('/cupom\s+(?:de\s+)?(\d+(?:[\.,]\d+)?)\s*%(?:\s*off)?(?:\s+(?:com\s+o\s+c[oó]digo|c[oó]digo)\s+([a-z0-9_\-]+))?/iu', $html, $m)) {
+                $pct = (float) str_replace(',', '.', $m[1]);
+                $code = ! empty($m[2]) ? mb_strtoupper(trim($m[2])) : 'CUPOM_ML';
+                if ($pct > 0 && $pct <= 80) {
+                    return [
+                        'code' => $code,
+                        'discount' => $pct,
+                        'type' => 'percentage',
+                    ];
+                }
+            }
+        }
+
+        // 3. Generic store patterns
+        if (preg_match('/(?:use|aplique|cupom)\s+(?:o\s+cupom\s+)?[\'"]?([a-z0-9_\-]{3,20})[\'"]?\s+(?:e\s+ganhe|para\s+ganhar|para|com)?\s*R\$\s*([\d\.,]+)/iu', $html, $m)) {
+            $code = mb_strtoupper(trim($m[1]));
+            $discount = $this->parsePrice($m[2]);
+            if ($discount && $discount > 0 && ! in_array($code, ['PRODUTO', 'OFERTA', 'DESCONTO'])) {
+                return [
+                    'code' => $code,
+                    'discount' => $discount,
+                    'type' => 'fixed',
+                ];
+            }
+        }
+
+        if (preg_match('/(?:use|aplique|cupom)\s+(?:o\s+cupom\s+)?[\'"]?([a-z0-9_\-]{3,20})[\'"]?\s+(?:e\s+ganhe|para\s+ganhar|para|com)?\s*(\d+(?:[\.,]\d+)?)\s*%/iu', $html, $m)) {
+            $code = mb_strtoupper(trim($m[1]));
+            $pct = (float) str_replace(',', '.', $m[2]);
+            if ($pct > 0 && $pct <= 80 && ! in_array($code, ['PRODUTO', 'OFERTA', 'DESCONTO'])) {
+                return [
+                    'code' => $code,
+                    'discount' => $pct,
+                    'type' => 'percentage',
+                ];
+            }
+        }
+
+        return null;
     }
 }

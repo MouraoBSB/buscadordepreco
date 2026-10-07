@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Products\Schemas;
 
+use App\Services\Product\ProductImageService;
 use App\Services\Profiling\ProductEnrichmentService;
 use Filament\Actions\Action;
 use Filament\Forms\Components\KeyValue;
@@ -60,8 +61,8 @@ class ProductForm
 
                                         // Auto-fetch image if empty
                                         if (empty($get('image_url'))) {
-                                            $imageService = app(\App\Services\Product\ProductImageService::class);
-                                            $imageQuery = trim(($profile->brand ? $profile->brand . ' ' : '') . ($profile->commercialName ?: $profile->name));
+                                            $imageService = app(ProductImageService::class);
+                                            $imageQuery = trim(($profile->brand ? $profile->brand.' ' : '').($profile->commercialName ?: $profile->name));
                                             $foundImage = $imageService->searchProductImage($imageQuery);
                                             if ($foundImage) {
                                                 $set('image_url', $foundImage);
@@ -116,13 +117,14 @@ class ProductForm
                                                 ->title('Informe o nome do produto primeiro')
                                                 ->warning()
                                                 ->send();
+
                                             return;
                                         }
 
                                         $brand = $get('brand');
-                                        $query = trim(($brand ? $brand . ' ' : '') . $name);
+                                        $query = trim(($brand ? $brand.' ' : '').$name);
 
-                                        $service = app(\App\Services\Product\ProductImageService::class);
+                                        $service = app(ProductImageService::class);
                                         $img = $service->searchProductImage($query);
 
                                         if ($img) {

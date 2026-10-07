@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Product\ProductImageService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -45,7 +46,7 @@ class Product extends Model
         static::created(function (Product $product) {
             if (blank($product->getRawOriginal('image_url'))) {
                 dispatch(function () use ($product) {
-                    app(\App\Services\Product\ProductImageService::class)->fetchAndAssignImage($product);
+                    app(ProductImageService::class)->fetchAndAssignImage($product);
                 })->afterResponse();
             }
         });
@@ -92,5 +93,10 @@ class Product extends Model
     public function alerts(): HasMany
     {
         return $this->hasMany(Alert::class);
+    }
+
+    public function coupons(): HasMany
+    {
+        return $this->hasMany(Coupon::class);
     }
 }

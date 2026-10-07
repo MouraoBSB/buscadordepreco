@@ -147,4 +147,52 @@ class MonitoredProductsWidgetTest extends TestCase
         $this->assertEquals('none', $items[0]['price_type']);
         $this->assertNull($items[0]['price_badge']);
     }
+
+    public function test_widget_exposes_three_price_scenarios_when_present(): void
+    {
+        $product = Product::create([
+            'name' => 'Lavadora Especial',
+            'target_price' => 2500,
+            'active' => true,
+        ]);
+
+        $store = Store::create([
+            'name' => 'Fast Shop',
+            'domain' => 'fastshop.com.br',
+        ]);
+
+        $source = ProductSource::create([
+            'product_id' => $product->id,
+            'store_id' => $store->id,
+            'url' => 'https://fastshop.com.br/item',
+            'collector_type' => 'generic_jsonld',
+            'active' => true,
+        ]);
+
+        PriceObservation::create([
+            'product_source_id' => $source->id,
+            'regular_price' => 2800.0,
+            'pix_price' => 2600.0,
+            'coupon_price' => 2450.0,
+            'coupon_code' => 'FAST150',
+            'coupon_discount' => 150.0,
+            'installment_price' => 280.0,
+            'installment_count' => 10,
+            'in_stock' => true,
+            'is_mismatch' => false,
+            'collected_at' => now(),
+        ]);
+
+        $widget = new MonitoredProductsWidget;
+        $items = $widget->getProducts();
+
+        $this->assertCount(1, $items);
+        $this->assertEquals(2450.0, $items[0]['current_price']);
+        $this->assertEquals(2800.0, $items[0]['regular_price']);
+        $this->assertEquals('10x R$ 280,00', $items[0]['installments_text']);
+        $this->assertEquals(2600.0, $items[0]['pix_price']);
+        $this->assertEquals(2450.0, $items[0]['coupon_price']);
+        $this->assertEquals('FAST150', $items[0]['coupon_code']);
+        $this->assertEquals(150.0, $items[0]['coupon_discount']);
+    }
 }

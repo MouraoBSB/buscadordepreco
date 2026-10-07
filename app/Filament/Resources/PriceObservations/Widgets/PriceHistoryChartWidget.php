@@ -10,7 +10,7 @@ class PriceHistoryChartWidget extends ChartWidget
 {
     protected ?string $heading = 'Evolução dos Preços Coletados';
 
-    protected int | string | array $columnSpan = 'full';
+    protected int|string|array $columnSpan = 'full';
 
     protected ?string $maxHeight = '280px';
 
@@ -20,12 +20,12 @@ class PriceHistoryChartWidget extends ChartWidget
     {
         $products = Product::whereHas('sources.observations')
             ->get()
-            ->mapWithKeys(fn ($p) => [(string) $p->id => ($p->brand ? $p->brand . ' - ' : '') . ($p->commercial_name ?: $p->name)])
+            ->mapWithKeys(fn ($p) => [(string) $p->id => ($p->brand ? $p->brand.' - ' : '').($p->commercial_name ?: $p->name)])
             ->toArray();
 
         if (empty($products)) {
             $products = Product::all()
-                ->mapWithKeys(fn ($p) => [(string) $p->id => ($p->brand ? $p->brand . ' - ' : '') . ($p->commercial_name ?: $p->name)])
+                ->mapWithKeys(fn ($p) => [(string) $p->id => ($p->brand ? $p->brand.' - ' : '').($p->commercial_name ?: $p->name)])
                 ->toArray();
         }
 

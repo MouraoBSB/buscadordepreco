@@ -2,8 +2,6 @@
 
 namespace App\Filament\Resources\PriceObservations;
 
-use App\Filament\Resources\PriceObservations\Pages\CreatePriceObservation;
-use App\Filament\Resources\PriceObservations\Pages\EditPriceObservation;
 use App\Filament\Resources\PriceObservations\Pages\ListPriceObservations;
 use App\Filament\Resources\PriceObservations\Schemas\PriceObservationForm;
 use App\Filament\Resources\PriceObservations\Tables\PriceObservationsTable;

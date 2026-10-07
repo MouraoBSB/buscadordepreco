@@ -2,9 +2,13 @@
 
 namespace App\Filament\Resources\Products\Tables;
 
+use App\Models\Product;
+use App\Services\Discovery\ProductDiscoveryService;
+use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Notifications\Notification;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -68,18 +72,18 @@ class ProductsTable
                 //
             ])
             ->recordActions([
-                \Filament\Actions\Action::make('discover')
+                Action::make('discover')
                     ->label('Buscar Ofertas')
                     ->icon('heroicon-o-sparkles')
                     ->color('success')
                     ->requiresConfirmation()
                     ->modalHeading('Descobrir Novas Ofertas')
                     ->modalDescription('O PriceWatch pesquisará os varejistas e motores de busca para encontrar novas fontes de compra para este produto.')
-                    ->action(function (\App\Models\Product $record) {
-                        $service = app(\App\Services\Discovery\ProductDiscoveryService::class);
+                    ->action(function (Product $record) {
+                        $service = app(ProductDiscoveryService::class);
                         $result = $service->discoverForProduct($record, triggerType: 'manual');
 
-                        \Filament\Notifications\Notification::make()
+                        Notification::make()
                             ->title('Descoberta finalizada!')
                             ->body("{$result['candidates_found']} ofertas analisadas: {$result['candidates_auto_approved']} auto-aprovadas, {$result['candidates_pending']} pendentes, {$result['candidates_rejected']} rejeitadas.")
                             ->success()
