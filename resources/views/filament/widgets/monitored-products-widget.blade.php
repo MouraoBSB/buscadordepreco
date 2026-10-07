@@ -60,14 +60,29 @@
                                 </span>
                             </div>
                             <div>
-                                <span style="color: #6b7280; display: block;">Menor Preço</span>
+                                <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.25rem;">
+                                    <span style="color: #6b7280; display: block;">{{ $product['price_label'] }}</span>
+                                    @if ($product['price_badge'])
+                                        <span style="font-size: 0.625rem; font-weight: 600; padding: 0.0625rem 0.375rem; border-radius: 0.25rem; {{ $product['badge_style'] }}">
+                                            {{ $product['price_badge'] }}
+                                        </span>
+                                    @endif
+                                </div>
                                 @if ($product['current_price'])
-                                    <span style="font-weight: 700; font-size: 1rem; color: {{ $product['is_below_target'] ? '#059669' : '#2563eb' }};">
+                                    <span style="font-weight: 700; font-size: 1rem; display: block; color: {{ $product['is_below_target'] ? '#059669' : ($product['price_type'] === 'in_stock' ? '#2563eb' : '#d97706') }};">
                                         R$ {{ number_format($product['current_price'], 2, ',', '.') }}
                                     </span>
+                                    @if (! empty($product['price_subtext']))
+                                        <span style="display: block; font-size: 0.6875rem; color: #6b7280; line-height: 1.15; margin-top: 0.125rem;">
+                                            {{ $product['price_subtext'] }}
+                                        </span>
+                                    @endif
                                 @else
-                                    <span style="font-size: 0.75rem; font-weight: 500; color: #d97706;">
+                                    <span style="font-size: 0.75rem; font-weight: 600; color: #d97706; display: block; margin-top: 0.125rem;">
                                         Aguardando coleta
+                                    </span>
+                                    <span style="display: block; font-size: 0.6875rem; color: #9ca3af; line-height: 1.15; margin-top: 0.125rem;">
+                                        Nenhum valor encontrado
                                     </span>
                                 @endif
                             </div>

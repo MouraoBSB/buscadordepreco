@@ -220,6 +220,17 @@ class ProductDiscoveryService
                         );
                     }
 
+                    // Extract price if available
+                    $detectedPrice = $rawCandidate->price;
+                    if (! $detectedPrice) {
+                        $textToScan = ($rawCandidate->snippet ?? '').' '.$rawCandidate->title;
+                        if (preg_match('/R\$\s*([\d\.]+(?:,\d{2})?)/iu', $textToScan, $mPrice)) {
+                            $cleanPrice = str_replace('.', '', $mPrice[1]);
+                            $cleanPrice = str_replace(',', '.', $cleanPrice);
+                            $detectedPrice = (float) $cleanPrice;
+                        }
+                    }
+
                     // Save / update DiscoveryCandidate
                     $candidateModel = DiscoveryCandidate::updateOrCreate(
                         [
@@ -233,6 +244,7 @@ class ProductDiscoveryService
                             'url' => $rawCandidate->url,
                             'raw_title' => $rawCandidate->title,
                             'detected_model' => $validation->matches['model_code_matched'] ?? false ? $product->model_code : null,
+                            'detected_price' => $detectedPrice,
                             'confidence_score' => $scoring['score'],
                             'scoring_breakdown' => $scoring['breakdown'],
                             'status' => $scoring['status'],

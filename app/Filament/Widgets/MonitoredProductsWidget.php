@@ -23,14 +23,95 @@ class MonitoredProductsWidget extends Widget
         $items = [];
 
         foreach ($products as $prod) {
-            $lowestObs = PriceObservation::query()
-                ->whereHas('source', fn ($q) => $q->where('product_id', $prod->id))
+            // 1. Current in-stock price from active sources
+            $lowestInStockObs = PriceObservation::query()
+                ->whereHas('source', fn ($q) => $q->where('product_id', $prod->id)->where('active', true))
                 ->where('is_mismatch', false)
                 ->where('in_stock', true)
+                ->whereRaw('COALESCE(pix_price, regular_price) > 0')
                 ->orderByRaw('COALESCE(pix_price, regular_price) ASC')
                 ->first();
 
+            // 2. Lowest historical price ever recorded (even if currently out of stock)
+            $lowestHistoricalObs = PriceObservation::query()
+                ->whereHas('source', fn ($q) => $q->where('product_id', $prod->id))
+                ->where('is_mismatch', false)
+                ->whereRaw('COALESCE(pix_price, regular_price) > 0')
+                ->orderByRaw('COALESCE(pix_price, regular_price) ASC')
+                ->first();
+
+            // 3. Latest price collected (most recent observation)
+            $latestObs = PriceObservation::query()
+                ->whereHas('source', fn ($q) => $q->where('product_id', $prod->id))
+                ->where('is_mismatch', false)
+                ->whereRaw('COALESCE(pix_price, regular_price) > 0')
+                ->orderBy('collected_at', 'DESC')
+                ->first();
+
+            // 4. Lowest detected candidate price (from discovery)
+            $lowestCandidate = $prod->discoveryCandidates()
+                ->whereIn('status', ['auto_approved', 'approved', 'pending_review'])
+                ->whereNotNull('detected_price')
+                ->where('detected_price', '>', 0)
+                ->orderBy('detected_price', 'ASC')
+                ->first();
+
+            $price = null;
+            $priceType = 'none';
+            $priceLabel = 'Menor Preço';
+            $priceBadge = null;
+            $badgeStyle = '';
+            $priceSubtext = null;
+
+            if ($lowestInStockObs) {
+                $price = (float) $lowestInStockObs->effective_price;
+                $priceType = 'in_stock';
+                $priceLabel = 'Menor Preço';
+                $priceBadge = 'Em estoque';
+                $badgeStyle = 'background-color: #dcfce7; color: #166534;';
+
+                if ($lowestHistoricalObs && (float) $lowestHistoricalObs->effective_price < $price) {
+                    $histFormatted = number_format((float) $lowestHistoricalObs->effective_price, 2, ',', '.');
+                    $priceSubtext = "Menor histórico: R$ {$histFormatted}";
+                }
+            } elseif ($lowestHistoricalObs) {
+                $price = (float) $lowestHistoricalObs->effective_price;
+                $priceType = 'historical';
+                $priceLabel = 'Menor Histórico';
+                $priceBadge = 'Menor histórico';
+                $badgeStyle = 'background-color: #fef3c7; color: #92400e;';
+
+                $latestPrice = $latestObs ? (float) $latestObs->effective_price : null;
+                $latestDate = $latestObs?->collected_at ? $latestObs->collected_at->format('d/m') : null;
+
+                if ($latestPrice && abs($latestPrice - $price) > 0.01) {
+                    $latestFormatted = number_format($latestPrice, 2, ',', '.');
+                    $priceSubtext = "Último: R$ {$latestFormatted}".($latestDate ? " ({$latestDate})" : '');
+                } elseif ($latestDate) {
+                    $priceSubtext = "Coletado em {$latestDate} (sem estoque atual)";
+                } else {
+                    $priceSubtext = 'Sem estoque no momento';
+                }
+            } elseif ($latestObs) {
+                $price = (float) $latestObs->effective_price;
+                $priceType = 'latest';
+                $priceLabel = 'Último Coletado';
+                $priceBadge = 'Último coletado';
+                $badgeStyle = 'background-color: #f3f4f6; color: #374151;';
+                $latestDate = $latestObs->collected_at ? $latestObs->collected_at->format('d/m') : null;
+                $priceSubtext = $latestDate ? "Coletado em {$latestDate}" : 'Último valor registrado';
+            } elseif ($lowestCandidate) {
+                $price = (float) $lowestCandidate->detected_price;
+                $priceType = 'detected';
+                $priceLabel = 'Preço Detectado';
+                $priceBadge = 'Detectado na busca';
+                $badgeStyle = 'background-color: #e0f2fe; color: #0369a1;';
+                $storeName = $lowestCandidate->discovered_store_name ?: 'Oferta online';
+                $priceSubtext = "Encontrado em {$storeName}";
+            }
+
             $activeSourcesCount = $prod->sources()->where('active', true)->count();
+            $isBelowTarget = $price !== null && $prod->target_price && $price <= (float) $prod->target_price;
 
             $items[] = [
                 'id' => $prod->id,
@@ -42,9 +123,14 @@ class MonitoredProductsWidget extends Widget
                 'capacity_kg' => $prod->capacity_kg,
                 'image_url' => $prod->image_url,
                 'target_price' => $prod->target_price ? (float) $prod->target_price : null,
-                'current_price' => $lowestObs ? (float) $lowestObs->effective_price : null,
+                'current_price' => $price,
+                'price_type' => $priceType,
+                'price_label' => $priceLabel,
+                'price_badge' => $priceBadge,
+                'badge_style' => $badgeStyle,
+                'price_subtext' => $priceSubtext,
                 'active_sources_count' => $activeSourcesCount,
-                'is_below_target' => $lowestObs && $prod->target_price && $lowestObs->effective_price <= (float) $prod->target_price,
+                'is_below_target' => $isBelowTarget,
             ];
         }
 

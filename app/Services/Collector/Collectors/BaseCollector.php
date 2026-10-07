@@ -4,6 +4,7 @@ namespace App\Services\Collector\Collectors;
 
 use App\Models\ProductSource;
 use App\Services\Collector\Contracts\PriceCollectorInterface;
+use App\Services\Discovery\CandidateValidator;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
@@ -106,11 +107,40 @@ abstract class BaseCollector implements PriceCollectorInterface
             $rawTextPlain = preg_replace('/[^a-zA-Z0-9]/', '', $textLower);
 
             if (! str_contains($textClean, $modelClean) && ! str_contains($rawTextPlain, $rawModelPlain)) {
+                // Check primary prefix before slash (e.g. MA512W165 from MA512W165/GK-05)
+                $prefix = explode('/', $source->expected_model)[0];
+                $prefixClean = Str::slug($prefix);
+                $rawPrefixPlain = preg_replace('/[^a-zA-Z0-9]/', '', mb_strtolower($prefix));
+                if (strlen($rawPrefixPlain) >= 5 && (str_contains($textClean, $prefixClean) || str_contains($rawTextPlain, $rawPrefixPlain))) {
+                    return null;
+                }
+
                 // If model is Panasonic NA-F180P7, check F180P7
                 $shortModel = preg_replace('/^(na-|wa-)/i', '', $source->expected_model);
                 $shortClean = Str::slug($shortModel);
 
                 if (! str_contains($textClean, $shortClean)) {
+                    // Check if commercial identity matches when product strict_model is false
+                    $product = null;
+                    try {
+                        $product = $source->relationLoaded('product') ? $source->getRelation('product') : ($source->exists ? $source->product : null);
+                    } catch (\Throwable) {
+                        $product = null;
+                    }
+                    if ($product && ! $product->strict_model) {
+                        $validator = app(CandidateValidator::class);
+                        $distinctive = $validator->extractDistinctiveProductTokens($product);
+                        $matchedCount = 0;
+                        foreach ($distinctive as $token) {
+                            if (str_contains($textLower, $token)) {
+                                $matchedCount++;
+                            }
+                        }
+                        if ($matchedCount >= 1 && ($product->brand ? str_contains($textLower, mb_strtolower($product->brand)) : true)) {
+                            return null;
+                        }
+                    }
+
                     return "Código do modelo esperado '{$source->expected_model}' não encontrado no anúncio.";
                 }
             }
