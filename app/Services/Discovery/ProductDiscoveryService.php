@@ -345,12 +345,42 @@ class ProductDiscoveryService
             }
         }
 
-        if (! $store && ! empty($candidate->discovered_store_domain)) {
-            $cleanDomain = preg_replace('/^www\./', '', $candidate->discovered_store_domain);
+        if (! $store) {
+            $domain = $candidate->discovered_store_domain;
+            if (empty($domain) && ! empty($candidate->url)) {
+                $parsedHost = parse_url($candidate->url, PHP_URL_HOST);
+                if ($parsedHost) {
+                    $domain = $parsedHost;
+                }
+            }
+
+            if (! empty($domain)) {
+                $cleanDomain = preg_replace('/^www\./', '', $domain);
+                $storeName = $candidate->discovered_store_name;
+                if (empty($storeName) || $storeName === $domain) {
+                    $storeName = ucfirst(explode('.', $cleanDomain)[0]);
+                }
+
+                $store = Store::firstOrCreate(
+                    ['domain' => $cleanDomain],
+                    [
+                        'name' => $storeName,
+                        'active' => true,
+                        'trust_level' => 'standard',
+                    ]
+                );
+
+                if (empty($candidate->discovered_store_domain)) {
+                    $candidate->update(['discovered_store_domain' => $cleanDomain]);
+                }
+            }
+        }
+
+        if (! $store) {
             $store = Store::firstOrCreate(
-                ['domain' => $cleanDomain],
+                ['domain' => 'loja-online.com'],
                 [
-                    'name' => $candidate->discovered_store_name ?: ucfirst(explode('.', $cleanDomain)[0]),
+                    'name' => 'Loja Online',
                     'active' => true,
                     'trust_level' => 'standard',
                 ]
