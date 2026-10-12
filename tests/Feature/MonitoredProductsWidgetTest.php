@@ -127,6 +127,8 @@ class MonitoredProductsWidgetTest extends TestCase
 
         $this->assertCount(1, $items);
         $this->assertEquals(1999.90, $items[0]['current_price']);
+        $this->assertEquals('https://example.com/item', $items[0]['offer_url']);
+        $this->assertEquals('Loja Exemplo', $items[0]['offer_store']);
         $this->assertEquals('detected', $items[0]['price_type']);
         $this->assertEquals('Detectado na busca', $items[0]['price_badge']);
         $this->assertStringContainsString('Loja Exemplo', $items[0]['price_subtext']);

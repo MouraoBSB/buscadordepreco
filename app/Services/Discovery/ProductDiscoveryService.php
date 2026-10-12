@@ -7,6 +7,7 @@ use App\Models\DiscoveryRun;
 use App\Models\Product;
 use App\Models\ProductSource;
 use App\Models\Store;
+use App\Services\Alerts\AlertEvaluator;
 use App\Services\Collector\Pipeline\CollectionPipeline;
 use App\Services\Discovery\Contracts\DiscoveryProviderInterface;
 use App\Services\Discovery\DTOs\RawCandidateDto;
@@ -176,6 +177,17 @@ class ProductDiscoveryService
                                 }
 
                                 $existingCandidate->update($updates);
+
+                                if ($existingCandidate->status === 'auto_approved') {
+                                    $this->ensureSourceForCandidate($product, $existingCandidate);
+                                    if ($existingCandidate->detected_price && (float) $existingCandidate->detected_price > 0) {
+                                        try {
+                                            app(AlertEvaluator::class)->evaluateCandidate($existingCandidate);
+                                        } catch (\Throwable $e) {
+                                            Log::warning("Candidate alert evaluation failed for existing candidate {$existingCandidate->id}: {$e->getMessage()}");
+                                        }
+                                    }
+                                }
                             }
                         }
 
@@ -264,36 +276,15 @@ class ProductDiscoveryService
                         $candidatesAutoApproved++;
 
                         // Automatically create ProductSource for auto-approved candidates
-                        $source = ProductSource::firstOrCreate(
-                            [
-                                'product_id' => $product->id,
-                                'url' => $rawCandidate->url,
-                            ],
-                            [
-                                'store_id' => $store?->id,
-                                'collector_type' => 'generic_jsonld',
-                                'expected_model' => $product->model_code,
-                                'expected_voltage' => $product->voltage ?: 'Bivolt',
-                                'active' => true,
-                                'status' => 'active',
-                                'priority' => 10,
-                                'discovery_candidate_id' => $candidateModel->id,
-                            ]
-                        );
+                        $this->ensureSourceForCandidate($product, $candidateModel, $store);
 
-                        $candidateModel->update([
-                            'product_source_id' => $source->id,
-                        ]);
-
-                        // Automatically trigger initial price collection for new auto-approved source
-                        if ($source->wasRecentlyCreated) {
-                            dispatch(function () use ($source) {
-                                try {
-                                    app(CollectionPipeline::class)->run($source);
-                                } catch (\Throwable $e) {
-                                    Log::warning("Immediate collection failed for auto-approved source {$source->id}: {$e->getMessage()}");
-                                }
-                            })->afterResponse();
+                        // Evaluate alerts for auto-approved candidate if price detected
+                        if ($candidateModel->detected_price && (float) $candidateModel->detected_price > 0) {
+                            try {
+                                app(AlertEvaluator::class)->evaluateCandidate($candidateModel);
+                            } catch (\Throwable $e) {
+                                Log::warning("Candidate alert evaluation failed for candidate {$candidateModel->id}: {$e->getMessage()}");
+                            }
                         }
                     } elseif ($scoring['status'] === 'pending_review') {
                         $candidatesPending++;
@@ -340,5 +331,63 @@ class ProductDiscoveryService
             'candidates_rejected' => $candidatesRejected,
             'duration_ms' => $run->duration_ms,
         ];
+    }
+
+    /**
+     * Ensure a ProductSource exists for an auto-approved or approved candidate.
+     */
+    public function ensureSourceForCandidate(Product $product, DiscoveryCandidate $candidate, ?Store $store = null): ?ProductSource
+    {
+        if ($candidate->product_source_id) {
+            $existing = ProductSource::find($candidate->product_source_id);
+            if ($existing) {
+                return $existing;
+            }
+        }
+
+        if (! $store && ! empty($candidate->discovered_store_domain)) {
+            $cleanDomain = preg_replace('/^www\./', '', $candidate->discovered_store_domain);
+            $store = Store::firstOrCreate(
+                ['domain' => $cleanDomain],
+                [
+                    'name' => $candidate->discovered_store_name ?: ucfirst(explode('.', $cleanDomain)[0]),
+                    'active' => true,
+                    'trust_level' => 'standard',
+                ]
+            );
+        }
+
+        $source = ProductSource::firstOrCreate(
+            [
+                'product_id' => $product->id,
+                'url' => $candidate->url,
+            ],
+            [
+                'store_id' => $store?->id,
+                'collector_type' => 'generic_jsonld',
+                'expected_model' => $product->model_code,
+                'expected_voltage' => $product->voltage ?: 'Bivolt',
+                'active' => true,
+                'status' => 'active',
+                'priority' => 10,
+                'discovery_candidate_id' => $candidate->id,
+            ]
+        );
+
+        if ($candidate->product_source_id !== $source->id) {
+            $candidate->update(['product_source_id' => $source->id]);
+        }
+
+        if ($source->wasRecentlyCreated) {
+            dispatch(function () use ($source) {
+                try {
+                    app(CollectionPipeline::class)->run($source);
+                } catch (\Throwable $e) {
+                    Log::warning("Immediate collection failed for auto-approved source {$source->id}: {$e->getMessage()}");
+                }
+            })->afterResponse();
+        }
+
+        return $source;
     }
 }

@@ -6,6 +6,7 @@ use App\Models\DiscoveryCandidate;
 use App\Models\Product;
 use App\Models\ProductSource;
 use App\Models\Store;
+use App\Services\Alerts\AlertEvaluator;
 use App\Services\Collector\Pipeline\CollectionPipeline;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
@@ -179,6 +180,15 @@ class DiscoveryCandidatesTable
                                 Log::warning("Collection on approve failed for source {$source->id}: {$e->getMessage()}");
                             }
                         })->afterResponse();
+
+                        // Evaluate alerts for approved candidate if detected price exists
+                        if ($record->detected_price && (float) $record->detected_price > 0) {
+                            try {
+                                app(AlertEvaluator::class)->evaluateCandidate($record);
+                            } catch (\Throwable $e) {
+                                Log::warning("Candidate alert evaluation failed on manual approve for candidate {$record->id}: {$e->getMessage()}");
+                            }
+                        }
 
                         Notification::make()
                             ->title('Oferta aprovada com sucesso!')

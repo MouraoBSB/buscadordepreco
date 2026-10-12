@@ -43,12 +43,19 @@
                                         </span>
                                     @endif
                                 </div>
-                                <h4 style="font-size: 0.875rem; font-weight: 700; color: #111827; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ $product['name'] }}">
-                                    {{ $product['commercial_name'] }}
-                                </h4>
-                                <p style="font-size: 0.75rem; color: #6b7280; font-family: monospace; margin-top: 0.125rem;">
-                                    {{ $product['model_code'] ?? 'Universal' }}
-                                </p>
+                                <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem;">
+                                    <div style="min-width: 0; flex: 1;">
+                                        <h4 style="font-size: 0.875rem; font-weight: 700; color: #111827; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ $product['name'] }}" class="dark:text-gray-100">
+                                            {{ $product['commercial_name'] }}
+                                        </h4>
+                                        <p style="font-size: 0.75rem; color: #6b7280; font-family: monospace; margin-top: 0.125rem;">
+                                            {{ $product['model_code'] ?? 'Universal' }}
+                                        </p>
+                                    </div>
+                                    <a href="{{ \App\Filament\Resources\Products\ProductResource::getUrl('edit', ['record' => $product['id']]) }}" title="Editar configurações do produto" style="color: #94a3b8; display: inline-flex; align-items: center; justify-content: center; padding: 0.125rem; border-radius: 0.25rem;" class="hover:text-primary-600 dark:hover:text-primary-400">
+                                        <x-filament::icon icon="heroicon-m-pencil-square" class="h-4 w-4" />
+                                    </a>
+                                </div>
                             </div>
                         </div>
 
@@ -150,10 +157,17 @@
                                 Buscar Ofertas
                             </x-filament::button>
 
-                            <a href="{{ \App\Filament\Resources\Products\ProductResource::getUrl('edit', ['record' => $product['id']]) }}" style="font-weight: 500; color: #2563eb; display: inline-flex; align-items: center; gap: 0.25rem; text-decoration: none; padding: 0.25rem 0.5rem;">
-                                <span>Ver</span>
-                                <x-filament::icon icon="heroicon-m-arrow-right" class="h-3.5 w-3.5" />
-                            </a>
+                            @if ($product['offer_url'])
+                                <a href="{{ $product['offer_url'] }}" target="_blank" rel="noopener noreferrer" style="font-weight: 600; color: #2563eb; display: inline-flex; align-items: center; gap: 0.25rem; text-decoration: none; padding: 0.25rem 0.625rem; border-radius: 0.375rem; background-color: #eff6ff; border: 1px solid #dbeafe;" class="hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/60 dark:text-blue-400 dark:border-blue-900" title="{{ $product['offer_store'] ? 'Abrir oferta em ' . $product['offer_store'] : 'Abrir oferta na loja' }}">
+                                    <span>Ver Oferta</span>
+                                    <x-filament::icon icon="heroicon-m-arrow-top-right-on-square" class="h-3.5 w-3.5" />
+                                </a>
+                            @else
+                                <a href="{{ \App\Filament\Resources\DiscoveryCandidates\DiscoveryCandidateResource::getUrl('index', ['tableFilters' => ['product_id' => ['value' => $product['id']]]]) }}" style="font-weight: 500; color: #64748b; display: inline-flex; align-items: center; gap: 0.25rem; text-decoration: none; padding: 0.25rem 0.5rem;" title="Ver ofertas e candidatos">
+                                    <span>Ver Ofertas</span>
+                                    <x-filament::icon icon="heroicon-m-arrow-right" class="h-3.5 w-3.5" />
+                                </a>
+                            @endif
                         </div>
                     </div>
                 </div>

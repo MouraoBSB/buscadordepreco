@@ -147,6 +147,19 @@ class MonitoredProductsWidget extends Widget
                 $regularPrice = (float) $lowestCandidate->detected_price;
             }
 
+            $offerUrl = null;
+            $offerStore = null;
+            if ($lowestInStockObs && $lowestInStockObs->source?->url) {
+                $offerUrl = $lowestInStockObs->source->url;
+                $offerStore = $lowestInStockObs->source->store?->name;
+            } elseif ($winningObs && $winningObs->source?->url) {
+                $offerUrl = $winningObs->source->url;
+                $offerStore = $winningObs->source->store?->name;
+            } elseif ($lowestCandidate && $lowestCandidate->url) {
+                $offerUrl = $lowestCandidate->url;
+                $offerStore = $lowestCandidate->discovered_store_name;
+            }
+
             $activeSourcesCount = $prod->sources()->where('active', true)->count();
             $isBelowTarget = $price !== null && $prod->target_price && $price <= (float) $prod->target_price;
 
@@ -161,6 +174,8 @@ class MonitoredProductsWidget extends Widget
                 'image_url' => $prod->image_url,
                 'target_price' => $prod->target_price ? (float) $prod->target_price : null,
                 'current_price' => $price,
+                'offer_url' => $offerUrl,
+                'offer_store' => $offerStore,
                 'price_type' => $priceType,
                 'price_label' => $priceLabel,
                 'price_badge' => $priceBadge,
