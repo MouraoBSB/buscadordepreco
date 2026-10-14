@@ -48,4 +48,8 @@ return [
         'monthly_limit' => (int) env('TAVILY_MONTHLY_LIMIT', 1000),
     ],
 
+    'serper' => [
+        'key' => env('SERPER_API_KEY'),
+    ],
+
 ];
