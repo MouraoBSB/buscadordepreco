@@ -123,13 +123,13 @@ class WhatsAppCouponExtractorTest extends TestCase
             ],
         ];
 
-        // 1. Unauthorized when secret is wrong or missing
+        // 1. Não autorizado com secret errado ou ausente
         $responseUnauthorized = $this->postJson('/api/webhooks/whatsapp', $payload, [
             'X-Webhook-Secret' => 'errado',
         ]);
         $responseUnauthorized->assertStatus(401);
 
-        // 2. Authorized when secret matches
+        // 2. Autorizado com secret correto
         $responseAuthorized = $this->postJson('/api/webhooks/whatsapp', $payload, [
             'X-Webhook-Secret' => 'teste-secret-123',
         ]);
@@ -140,5 +140,32 @@ class WhatsAppCouponExtractorTest extends TestCase
         Queue::assertPushed(ProcessWhatsAppGroupMessageJob::class, function ($job) {
             return ($job->data['event'] ?? null) === 'message';
         });
+
+        // 3. Autorizado com assinatura HMAC-SHA256 válida
+        $content = json_encode($payload);
+        $hmac = hash_hmac('sha256', $content, 'teste-secret-123');
+        $responseHmac = $this->call(
+            'POST',
+            '/api/webhooks/whatsapp',
+            [],
+            [],
+            [],
+            [
+                'HTTP_X_HUB_SIGNATURE_256' => "sha256={$hmac}",
+                'CONTENT_TYPE' => 'application/json',
+            ],
+            $content
+        );
+        $responseHmac->assertStatus(200);
+
+        // 4. Evento que não é mensagem é ignorado sem enfileirar job
+        Queue::fake();
+        $responseNonMessage = $this->postJson('/api/webhooks/whatsapp', ['event' => 'group.participants'], [
+            'X-Webhook-Secret' => 'teste-secret-123',
+        ]);
+        $responseNonMessage->assertStatus(200);
+        $responseNonMessage->assertJson(['status' => 'ignored']);
+        // O model Product agenda closures afterResponse; só o job do webhook interessa aqui
+        Queue::assertNotPushed(ProcessWhatsAppGroupMessageJob::class);
     }
 }
