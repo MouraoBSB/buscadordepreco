@@ -62,6 +62,9 @@ real**. WhatsApp, parser de cupons e auditoria foram construídos cedo demais.
   dependem do 8.3):
   `C:\Users\moura\AppData\Local\Microsoft\WinGet\Packages\PHP.PHP.8.4_Microsoft.Winget.Source_8wekyb3d8bbwe\php.exe artisan test`
 - O `composer` não está no PATH do Git Bash.
+- Nenhum dos PHPs locais tem CA bundle configurado (cURL error 60). Para chamadas HTTPS
+  reais, passe o bundle do Git sem mexer no `php.ini`:
+  `php.exe -d curl.cainfo="C:\Program Files\Git\mingw64\etc\ssl\certs\ca-bundle.crt" -d openssl.cafile="C:\Program Files\Git\mingw64\etc\ssl\certs\ca-bundle.crt" artisan pricewatch:probe ...`
 - O MCP `laravel-boost` falha ao iniciar neste host (spawn do `php`).
 - `README.md`, `ARCHITECTURE.md` e `RUNBOOK.md` descrevem o foco original nas 3 lavadoras e
   estão parcialmente desatualizados.
@@ -88,7 +91,31 @@ real**. WhatsApp, parser de cupons e auditoria foram construídos cedo demais.
   `afterResponse` agendada pelo model `Product` ao criar o produto do `setUp`. Agora o teste
   verifica `assertNotPushed(ProcessWhatsAppGroupMessageJob)` e voltou a checar o
   `assertPushed` do job.
+- Comentários traduzidos, cabeçalho de autoria incluído, Pint ok. Commits `66741e8`
+  (webhook) e `f7b9d8b` (Fase 0).
+- **Primeiro probe real** (IP residencial, não a VPS; 28 créditos):
+
+  | Busca | No Shopping | Verificadas | Confirmadas | Preço dif. | Bloqueadas | Outros |
+  |---|---|---|---|---|---|---|
+  | Midea MA512W165 | 12 | 8 | 3 | 0 | 2 | 2 sem_preco, 1 sem_link |
+  | Panasonic NA-F180P7 | 1 | 1 | 0 | 0 | 1 | — |
+  | Samsung WA17CG6746 | 3 | 3 | 0 | 1 | 1 | 1 sem_preco |
+  | galaxy s25 256gb | 40 | 8 | 0 | 0 | 5 | 2 sem_preco, 1 indisp. |
+
+  Leituras:
+  - O **Google Shopping tem cobertura** (40 ofertas de S25, contra 0 no Tavily).
+  - **A verificação ao vivo nas grandes lojas não é viável** por HTTP simples: Magalu e
+    Casas Bahia devolvem 403 até de IP residencial (da VPS deve ser pior). A Amazon abre,
+    mas sem JSON-LD (`sem_preco`).
+  - As 3 "confirmadas" são **produtos errados** (Midea com agitador, 15/16 kg, lava e seca).
+    Falta filtro de identidade antes de verificar.
+  - A resolução de URL às vezes cai em outra loja ou outro país (Leroy Merlin → Shopee,
+    Desertcart → homedepot.com, samsung.com/us).
+  - Na prática, nenhuma oferta certa foi confirmada ao vivo.
 - Pendências:
-  - Traduzir para pt-BR os comentários do código novo e incluir o cabeçalho de autoria.
-  - Executar `pricewatch:probe` com produtos reais e registrar os números aqui.
+  - Decidir a fonte de verdade do preço: Google Shopping (o Merchant Center exige preço
+    correto), checagem ao vivo ou APIs de afiliados (Amazon, Mercado Livre, Awin/Magalu).
+  - Filtrar identidade (código do modelo, variante) antes de gastar crédito na verificação.
+  - Ler o preço da Amazon pelo HTML (`a-price-whole`), como já faz o
+    `GenericJsonLdCollector`.
   - Definir o critério numérico de "seguir ou encerrar".
