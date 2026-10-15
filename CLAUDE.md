@@ -100,6 +100,28 @@ grátis (cerca de US$ 1 por 1.000, créditos expiram em 6 meses).
 
 ## Registro
 
+### 2026-10-14 (link real da loja)
+- O usuário apontou que "Ver Oferta" também abria um agregador do Google. O Serper não
+  devolve o endereço da loja no `/shopping`; só há links do Google.
+- Solução (`f4544d1`, `e2ad943`):
+  - `SerperShoppingClient::findStorePage()` faz um `/search` com `site:<domínio>` (1
+    crédito) e devolve URL e título.
+  - Loja sem domínio conhecido: a busca é por título + loja, e o resultado só vale se o
+    host contiver o nome da loja (a Outlet do Celular caía em `shop.samsung.com`).
+  - O `ShoppingPriceRecorder` procura o endereço só para a melhor oferta (confiável) e a
+    mais barata, valida o título do resultado com o `validateListing` e guarda
+    `metadata.direct_url` e `direct_lookup_at`.
+  - O resultado, inclusive o "não encontrado", é reaproveitado por 7 dias para a mesma
+    fonte e o mesmo título (`DirectLinkCacheDays`).
+  - O card mostra "Ver na loja" (endereço real) ou "Ver no Google" (busca da oferta). O
+    botão "Comparar lojas" continua abrindo o painel do produto.
+- Teste manual (5 créditos): KaBuM, Magalu, Shopee e Mercado Livre devolveram a página
+  certa; a loja desconhecida caiu em outra loja (por isso a regra do host).
+- Produção: 5 de 6 produtos com "Ver na loja" (Magalu, Extra, Shopee, Mercado Livre,
+  KaBuM). O Switch 2 no Mercado Livre não teve página encontrada.
+  - A primeira rodada gastou 22 créditos (12 de busca e 10 de endereço). As seguintes
+    reaproveitam o cache.
+
 ### 2026-10-14 (dois links, preço atual e lojas confiáveis)
 - O usuário quis **manter** a página geral do Google (para explorar outras lojas), além de
   ter o link da oferta da loja. Diretriz: ampliar recursos em vez de substituir.
