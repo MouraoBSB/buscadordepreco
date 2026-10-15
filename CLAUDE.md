@@ -100,6 +100,32 @@ grátis (cerca de US$ 1 por 1.000, créditos expiram em 6 meses).
 
 ## Registro
 
+### 2026-10-14 (dois links, preço atual e lojas confiáveis)
+- O usuário quis **manter** a página geral do Google (para explorar outras lojas), além de
+  ter o link da oferta da loja. Diretriz: ampliar recursos em vez de substituir.
+- Implementado (`d7601c3`, `adfbbda`):
+  - `ShoppingOffer::storeSearchLink()` (busca título + loja) passou a ser o `url` da
+    fonte. O painel do Google fica em `metadata.google_link`.
+  - O card ganhou o botão "Comparar lojas", e o alerta leva os dois links.
+  - O card considera como preço atual só as observações das últimas 24h
+    (`CurrentPriceWindowHours`). O mínimo de todo o histórico vira "Menor histórico".
+  - Lojas confiáveis: `Store::TrustedLevels` (`official`, `marketplace_1p`).
+    - Lojas conhecidas do Shopping são criadas ou promovidas como `marketplace_1p`; a
+      Shopee entra como `marketplace_3p`.
+    - Lojas desconhecidas ficam como `standard`.
+    - O preço principal e o alerta usam a melhor oferta confiável. Uma oferta mais barata
+      de loja não verificada vira um aviso amarelo no card.
+    - Sem nenhuma oferta confiável, o card mostra a melhor oferta com "Loja pouco
+      conhecida".
+  - No cadastro de lojas, o domínio passou a ser opcional e foi incluída a opção "Não
+    verificada", para o usuário promover lojas.
+- Produção após a rodada:
+  - S25: R$ 3.163,13 na KaBuM, com aviso de R$ 2.763,90 na Outlet do Celular.
+  - Switch 2: R$ 3.752 no Mercado Livre, com aviso de R$ 2.934,48 na CSTech.
+  - Panasonic e Samsung: só aparecem na Shopee (3P), marcadas como "Loja pouco conhecida".
+- Ponto em aberto: o texto "Menor histórico" do card ainda considera lojas não verificadas
+  (no S25 mostra R$ 2.763,90 da Outlet).
+
 ### 2026-10-14 (divergência de preço e produtos usados)
 - O card do S25 mostrava R$ 2.763,90 (Outlet do Celular), mas o link levava a outro
   preço. Causas:
