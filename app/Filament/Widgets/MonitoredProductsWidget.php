@@ -43,7 +43,8 @@ class MonitoredProductsWidget extends Widget
             $lowestInStockObs = $lowestTrustedObs ?? $lowestAnyObs;
 
             // Oferta mais barata de loja não verificada vira aviso, sem substituir o preço principal
-            $unverifiedObs = $lowestTrustedObs && $lowestAnyObs && $lowestAnyObs->id !== $lowestTrustedObs->id
+            $unverifiedObs = $lowestTrustedObs && $lowestAnyObs
+                && (float) $lowestAnyObs->effective_price < (float) $lowestTrustedObs->effective_price
                 ? $lowestAnyObs
                 : null;
 

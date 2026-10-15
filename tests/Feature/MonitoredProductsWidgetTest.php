@@ -116,6 +116,13 @@ class MonitoredProductsWidgetTest extends TestCase
         $this->assertSame('https://www.google.com/search?q=kabum', $item['offer_url']);
         $this->assertSame('https://www.google.com/search?ibp=oshop&prds=kabum', $item['compare_url']);
         $this->assertSame(['price' => 2763.90, 'store' => 'Outlet do Celular', 'url' => 'https://www.google.com/search?q=outlet'], $item['unverified_offer']);
+
+        // Com o mesmo preço da loja confiável não há o que avisar
+        PriceObservation::whereHas('source.store', fn ($query) => $query->where('name', 'Outlet do Celular'))->update(['regular_price' => 3163.13]);
+
+        [$item] = (new MonitoredProductsWidget)->getProducts();
+
+        $this->assertNull($item['unverified_offer']);
     }
 
     public function test_widget_current_price_ignores_offers_older_than_24_hours(): void
