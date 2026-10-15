@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,6 +12,9 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 class ProductSource extends Model
 {
     use HasFactory;
+
+    // Fontes alimentadas pelo Google Shopping (pricewatch:shopping); não devem passar pelo coletor HTTP
+    public const string CollectorGoogleShopping = 'google_shopping';
 
     protected $fillable = [
         'product_id',
@@ -31,6 +35,19 @@ class ProductSource extends Model
         'priority' => 'integer',
         'last_checked_at' => 'datetime',
     ];
+
+    /**
+     * Fontes cuja página pode ser coletada por HTTP (exclui as do Google Shopping).
+     */
+    public function scopeScrapable(Builder $query): Builder
+    {
+        return $query->where('collector_type', '!=', self::CollectorGoogleShopping);
+    }
+
+    public function isGoogleShopping(): bool
+    {
+        return $this->collector_type === self::CollectorGoogleShopping;
+    }
 
     public function product(): BelongsTo
     {

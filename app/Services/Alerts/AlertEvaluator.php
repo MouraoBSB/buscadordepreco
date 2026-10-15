@@ -90,6 +90,7 @@ class AlertEvaluator
                 $previousLowest = PriceObservation::query()
                     ->whereHas('source', fn ($q) => $q->where('product_id', $product->id))
                     ->where('is_mismatch', false)
+                    ->where('is_suspicious', false)
                     ->where('id', '!=', $observation->id)
                     ->whereNotNull('pix_price')
                     ->min('pix_price');
@@ -98,6 +99,7 @@ class AlertEvaluator
                     $previousLowest = PriceObservation::query()
                         ->whereHas('source', fn ($q) => $q->where('product_id', $product->id))
                         ->where('is_mismatch', false)
+                        ->where('is_suspicious', false)
                         ->where('id', '!=', $observation->id)
                         ->whereNotNull('regular_price')
                         ->min('regular_price');
@@ -114,9 +116,9 @@ class AlertEvaluator
                 // Cooldown / Deduplication: don't alert if sent within last 24h with same or lower price
                 $recentAlert = Alert::where('product_id', $product->id)
                     ->where('rule_id', $rule->id)
-                    ->where('status', 'sent')
-                    ->where('sent_at', '>=', Carbon::now()->subHours(24))
-                    ->latest('sent_at')
+                    ->whereIn('status', ['sent', 'skipped'])
+                    ->where('created_at', '>=', Carbon::now()->subHours(24))
+                    ->latest('created_at')
                     ->first();
 
                 if ($recentAlert && isset($recentAlert->payload['price']) && (float) $recentAlert->payload['price'] <= $effectivePrice) {
@@ -188,19 +190,7 @@ class AlertEvaluator
         ]);
 
         // 1. Send via GoWA (WhatsApp)
-        $result = $this->goWaChannel->sendMessage($message);
-
-        if ($result['ok']) {
-            $alertRecord->update([
-                'status' => 'sent',
-                'sent_at' => Carbon::now(),
-            ]);
-        } else {
-            $alertRecord->update([
-                'status' => 'failed',
-                'error_message' => $result['error'] ?? 'Erro desconhecido ao enviar pelo GoWA',
-            ]);
-        }
+        $this->deliverViaWhatsApp($alertRecord, $message);
 
         // 2. Send via Filament Database Notification (Web Dashboard)
         try {
@@ -223,6 +213,28 @@ class AlertEvaluator
         } catch (\Throwable $e) {
             Log::warning("Erro ao enviar notificação interna do painel: {$e->getMessage()}");
         }
+    }
+
+    /**
+     * Envia pelo WhatsApp e registra o resultado; com o canal desativado o alerta fica como "skipped".
+     */
+    protected function deliverViaWhatsApp(Alert $alertRecord, string $message): void
+    {
+        $result = $this->goWaChannel->sendMessage($message);
+
+        if ($result['ok']) {
+            $alertRecord->update([
+                'status' => 'sent',
+                'sent_at' => Carbon::now(),
+            ]);
+
+            return;
+        }
+
+        $alertRecord->update([
+            'status' => ($result['skipped'] ?? false) ? 'skipped' : 'failed',
+            'error_message' => $result['error'] ?? 'Erro desconhecido ao enviar pelo GoWA',
+        ]);
     }
 
     /**
@@ -268,6 +280,7 @@ class AlertEvaluator
                 $previousLowest = PriceObservation::query()
                     ->whereHas('source', fn ($q) => $q->where('product_id', $product->id))
                     ->where('is_mismatch', false)
+                    ->where('is_suspicious', false)
                     ->whereNotNull('pix_price')
                     ->min('pix_price');
 
@@ -275,6 +288,7 @@ class AlertEvaluator
                     $previousLowest = PriceObservation::query()
                         ->whereHas('source', fn ($q) => $q->where('product_id', $product->id))
                         ->where('is_mismatch', false)
+                        ->where('is_suspicious', false)
                         ->whereNotNull('regular_price')
                         ->min('regular_price');
                 }
@@ -290,9 +304,9 @@ class AlertEvaluator
                 // Cooldown / Deduplication: don't alert if sent within last 24h with same or lower price
                 $recentAlert = Alert::where('product_id', $product->id)
                     ->where('rule_id', $rule->id)
-                    ->where('status', 'sent')
-                    ->where('sent_at', '>=', Carbon::now()->subHours(24))
-                    ->latest('sent_at')
+                    ->whereIn('status', ['sent', 'skipped'])
+                    ->where('created_at', '>=', Carbon::now()->subHours(24))
+                    ->latest('created_at')
                     ->first();
 
                 if ($recentAlert && isset($recentAlert->payload['price']) && (float) $recentAlert->payload['price'] <= $detectedPrice) {
@@ -339,19 +353,7 @@ class AlertEvaluator
         ]);
 
         // 1. Send via GoWA (WhatsApp)
-        $result = $this->goWaChannel->sendMessage($message);
-
-        if ($result['ok']) {
-            $alertRecord->update([
-                'status' => 'sent',
-                'sent_at' => Carbon::now(),
-            ]);
-        } else {
-            $alertRecord->update([
-                'status' => 'failed',
-                'error_message' => $result['error'] ?? 'Erro desconhecido ao enviar pelo GoWA',
-            ]);
-        }
+        $this->deliverViaWhatsApp($alertRecord, $message);
 
         // 2. Send via Filament Database Notification (Web Dashboard)
         try {

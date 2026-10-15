@@ -12,6 +12,7 @@ use App\Services\Shopping\OfferPageVerifier;
 use App\Services\Shopping\SerperShoppingClient;
 use App\Services\Shopping\ShoppingOffer;
 use App\Services\Shopping\ShoppingOfferMatcher;
+use App\Services\Shopping\ShoppingPriceRecorder;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 
@@ -84,24 +85,12 @@ class ProbeOffersCommand extends Command
         return $query === '' ? [] : [new Product(['name' => $query, 'active' => true])];
     }
 
-    protected function searchQueryFor(Product $product): string
-    {
-        $query = $product->name;
-        $modelCode = (string) $product->model_code;
-
-        if (preg_match('/\d/', $modelCode) && ! Str::contains($query, $modelCode, ignoreCase: true)) {
-            $query .= ' '.$modelCode;
-        }
-
-        return $query;
-    }
-
     /**
      * @return array<int, string|int>
      */
     protected function probeProduct(Product $product, SerperShoppingClient $serper, ShoppingOfferMatcher $matcher, OfferPageVerifier $verifier): array
     {
-        $query = $this->searchQueryFor($product);
+        $query = app(ShoppingPriceRecorder::class)->searchQueryFor($product);
 
         $this->newLine();
         $this->info("Busca: \"{$query}\"");

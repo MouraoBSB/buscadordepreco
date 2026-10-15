@@ -23,11 +23,24 @@ class GoWaChannel
         $this->defaultRecipient = config('services.gowa.recipient_phone');
     }
 
+    public function isEnabled(): bool
+    {
+        return (bool) config('services.gowa.enabled', false);
+    }
+
     /**
      * Send a WhatsApp message via GoWA.
      */
     public function sendMessage(string $message, ?string $phone = null): array
     {
+        if (! $this->isEnabled()) {
+            return [
+                'ok' => false,
+                'skipped' => true,
+                'error' => 'Envio por WhatsApp desativado (GOWA_ENABLED=false).',
+            ];
+        }
+
         $targetPhone = $phone ?: $this->defaultRecipient;
 
         if (empty($targetPhone)) {

@@ -30,7 +30,7 @@ class CollectPricesCommand extends Command
         $sourceId = $this->option('source');
         $productId = $this->option('product');
 
-        $query = ProductSource::query()->where('active', true);
+        $query = ProductSource::query()->scrapable()->where('active', true);
 
         if ($sourceId) {
             $query->where('id', $sourceId);

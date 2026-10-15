@@ -216,7 +216,7 @@ class MonitoredProductsWidget extends Widget
             // Collect fresh prices for active sources of this product
             $pipeline = app(CollectionPipeline::class);
             $collectedCount = 0;
-            foreach ($product->sources()->where('active', true)->get() as $source) {
+            foreach ($product->sources()->scrapable()->where('active', true)->get() as $source) {
                 try {
                     $pipeline->run($source);
                     $collectedCount++;
@@ -272,7 +272,7 @@ class MonitoredProductsWidget extends Widget
                 $totalApproved += $result['candidates_auto_approved'] ?? 0;
                 $totalPending += $result['candidates_pending'] ?? 0;
 
-                foreach ($product->sources()->where('active', true)->get() as $source) {
+                foreach ($product->sources()->scrapable()->where('active', true)->get() as $source) {
                     try {
                         $pipeline->run($source);
                     } catch (\Throwable $e) {

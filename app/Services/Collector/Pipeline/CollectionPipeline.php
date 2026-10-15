@@ -25,6 +25,11 @@ class CollectionPipeline
      */
     public function run(ProductSource $source): PriceResult
     {
+        // O link do Google Shopping não é página de loja; essas fontes são atualizadas por pricewatch:shopping
+        if ($source->isGoogleShopping()) {
+            return PriceResult::failure('Fonte do Google Shopping é atualizada pelo comando pricewatch:shopping.', 'GOOGLE_SHOPPING_SOURCE');
+        }
+
         $startedAt = Carbon::now();
 
         $run = CollectionRun::create([

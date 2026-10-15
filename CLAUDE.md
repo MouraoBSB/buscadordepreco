@@ -100,6 +100,46 @@ grátis (cerca de US$ 1 por 1.000, créditos expiram em 6 meses).
 
 ## Registro
 
+### 2026-10-14 (passo 4: gravação automática e alertas)
+- **WhatsApp desligado de propósito:** o número foi compartilhado com outro projeto e
+  quebrou os dois. O usuário vai providenciar um número exclusivo.
+  - Novo `GOWA_ENABLED` (padrão `false`). Com ele desligado, o `GoWaChannel` não chama a
+    API e o alerta é gravado com status `skipped`, mas continua indo para o sino do painel
+    (Filament).
+- Passo 4 implementado **sem migration**, reaproveitando as tabelas existentes:
+  - `ShoppingPriceRecorder`: uma `ProductSource` por produto e loja com
+    `collector_type = google_shopping` (URL = link do Google, atualizado a cada rodada) e
+    uma `PriceObservation` por loja por rodada (a oferta mais barata da loja).
+  - A loja é encontrada pelo domínio conhecido (`domainForStore`) ou criada pelo nome com
+    `domain = ''`.
+  - O alerta é avaliado só para a oferta mais barata e não suspeita de cada rodada,
+    usando as `alert_rules` existentes (`target_price`, `lowest_price`).
+  - Comando `pricewatch:shopping {--product=}`, agendado `0 8,12,16,20 * * *`
+    (America/Sao_Paulo).
+  - O coletor HTTP nunca processa fontes `google_shopping`: há uma guarda no
+    `CollectionPipeline::run`, o escopo `ProductSource::scrapable()` no
+    `pricewatch:collect` e nos botões do `MonitoredProductsWidget`.
+  - Correções no `AlertEvaluator`:
+    - O envio foi unificado em `deliverViaWhatsApp`.
+    - O cooldown de 24h passou a considerar também os alertas `skipped`.
+    - A regra `lowest_price` passou a ignorar observações `is_suspicious`; antes, um preço
+      errado virava o "recorde" e bloqueava alertas reais.
+- 44/44 testes passando. Rodada real no banco local (6 créditos):
+  - Midea: R$ 2.114,10 (Info Store), abaixo da meta de R$ 2.200; gerou alertas de meta e
+    de menor histórico.
+  - Panasonic: R$ 2.799,00 (Pontofrio).
+  - Samsung: R$ 2.626,59 (Shopee), abaixo da meta de R$ 3.000.
+- Para produção:
+  - O `.env` precisa de `SERPER_API_KEY`, e o scheduler precisa estar rodando no worker.
+  - `GOWA_ENABLED` ausente equivale a desligado.
+- Pendências:
+  - Ligar `GOWA_ENABLED=true` quando houver número exclusivo.
+  - Decidir se a descoberta via Tavily (`pricewatch:discover`, terça e sexta) e a coleta
+    HTTP (`pricewatch:collect`, diária) continuam agendadas.
+  - O `.env.example` contém um telefone real em `GOWA_RECIPIENT_PHONE`; avaliar trocar por
+    um valor fictício.
+  - Passo 5 (capturar ofertas de grupos de WhatsApp) depende do número novo.
+
 ### 2026-10-14
 - Claude assumiu o projeto. Este `CLAUDE.md` substituiu o stub de bootstrap do Boost (o
   Boost já estava instalado; as diretrizes estão em `AGENTS.md`).
@@ -160,9 +200,6 @@ grátis (cerca de US$ 1 por 1.000, créditos expiram em 6 meses).
   Todas as aceitas têm link. As recusadas são variantes, usados, kits ou outras capacidades.
 - Créditos Serper gastos até agora: cerca de 46 de 2.500.
 - Pendências:
-  - Passo 4: gravar as ofertas aceitas no histórico (`price_observations` ou estrutura
-    nova; conferir o schema antes) e alertar abaixo da meta ou da média, rodando pelo
-    scheduler.
   - Definir o critério numérico de "seguir ou encerrar", que pode já estar respondido.
 - Links testados pelo usuário no navegador:
   - O link original do Serper (`ibp=oshop&prds=...gpcid...`) abre o painel do produto com

@@ -14,6 +14,12 @@ Schedule::command('pricewatch:collect')
     ->withoutOverlapping()
     ->runInBackground();
 
+// Preços do Google Shopping 4x ao dia (2 créditos Serper por produto a cada rodada)
+Schedule::command('pricewatch:shopping')
+    ->cron('0 8,12,16,20 * * *')
+    ->withoutOverlapping()
+    ->runInBackground();
+
 // Schedule discovery twice a week (Tuesday & Friday at 09:00) to find new deals and stores
 Schedule::command('pricewatch:discover')
     ->days([2, 5])
