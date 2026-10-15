@@ -51,6 +51,7 @@ class ProbeOffersCommandTest extends TestCase
             'kit' => new ShoppingOffer('Smartphone Samsung Galaxy S25 256GB - 5G + Smartwatch Galaxy Watch8', 'Magalu', 5228.99),
             'capinha' => new ShoppingOffer('Capinha Personalizada Samsung Galaxy S25 256GB Gocase', 'Gocase', 69.90),
             'pelicula' => new ShoppingOffer('Película de Vidro Galaxy S25 256GB', 'Shopee', 19.90),
+            'nota_conservacao' => new ShoppingOffer('Samsung Galaxy S25 256 GB Cinza - Muito Bom - Cinza - Muito Bom', 'CellularStore', 2573.10),
             'barato' => new ShoppingOffer('Samsung Galaxy S25 256GB Azul', 'Loja Desconhecida', 1500.00),
             'sem_preco' => new ShoppingOffer('Samsung Galaxy S25 256GB', 'Fast Shop', null),
         ];
@@ -61,7 +62,7 @@ class ProbeOffersCommandTest extends TestCase
         $this->assertSame(ShoppingOfferMatcher::Accepted, $results['ram']['status']);
         $this->assertSame(ShoppingOfferMatcher::Suspicious, $results['barato']['status']);
 
-        foreach (['ultra', 'mais', 'usado', 'armazenamento', 'sem_preco', 'como_novo', 'kit', 'capinha', 'pelicula'] as $key) {
+        foreach (['ultra', 'mais', 'usado', 'armazenamento', 'sem_preco', 'como_novo', 'kit', 'capinha', 'pelicula', 'nota_conservacao'] as $key) {
             $this->assertSame(ShoppingOfferMatcher::Rejected, $results[$key]['status'], "Oferta '{$key}' deveria ser recusada.");
         }
 

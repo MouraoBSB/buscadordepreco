@@ -100,6 +100,37 @@ grátis (cerca de US$ 1 por 1.000, créditos expiram em 6 meses).
 
 ## Registro
 
+### 2026-10-14 (correções do painel e Tavily só para fotos)
+- O usuário viu preços ilógicos no card: Galaxy S25 a R$ 69,90 (capinha) e Switch 2 a
+  R$ 129 (jogo).
+  - O `ShoppingOfferMatcher` já os marcava `is_suspicious`, mas o
+    `MonitoredProductsWidget` não filtrava suspeitas. Agora filtra.
+  - O validador ganhou regras para acessório/jogo (capa, película, carregador, jogo,
+    edition, controle, cartão de jogo, código digital...) e para nota de conservação de
+    seminovo ("- Muito Bom", "- Excelente"), além da loja `cellularstore`.
+  - Jogos sem palavra-chave (ex.: "Welcome Tour") continuam caindo na trava de mediana.
+- Tensão:
+  - O `ProductForm` vinha com `default('Bivolt')`, e todo produto, inclusive celular e
+    console, ganhava "Bivolt". Agora a tensão é opcional ("Não se aplica").
+  - O card oculta marca e modelo vazios; antes exibia "Universal".
+  - Em produção, a tensão do Galaxy S25 e do Nintendo Switch 2 foi zerada. A bike ficou
+    com Bivolt.
+- **Tavily só para fotos (decisão do usuário):**
+  - `pricewatch:discover` e `pricewatch:collect` saíram do agendamento e continuam
+    disponíveis manualmente.
+  - Os botões "Buscar Ofertas" do painel passaram a usar o `ShoppingPriceRecorder`.
+- Consumo do Serper:
+  - Cada chamada é gravada em `api_usage_logs` (`provider = serper`, `purpose` igual a
+    `shopping` ou `store_url`).
+  - O `TavilyQuotaWidget` virou `ApiUsageWidget`: Serper no mês e no dia, mais o Tavily
+    das fotos.
+  - Orçamento mensal em `SERPER_MONTHLY_LIMIT` (padrão 2000). Com 6 produtos, são cerca
+    de 1.440 créditos por mês.
+- Pontos em aberto:
+  - Lojas estrangeiras no Shopping (Microless, nos Emirados, a R$ 3.176 no Switch 2).
+  - O Kaspersky bloqueia o `claude.exe` ao iniciar o `php`; o `.mcp.json` aponta para o
+    `php` do sistema (8.3).
+
 ### 2026-10-14 (deploy em produção)
 - **Deploy feito por Claude** (o usuário sempre pede o deploy por aqui), seguindo o RUNBOOK:
   `git pull`, `docker compose build app worker`, `up -d`, `migrate --force` e caches.

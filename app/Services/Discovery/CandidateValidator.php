@@ -36,9 +36,14 @@ class CandidateValidator
         }
 
         // 0.2 Usado, recondicionado ou vitrine só passa se o próprio produto for assim
-        $usedPattern = '/\b(usad[oa]s?|recondicionad[oa]s?|seminov[oa]s?|como\s+nov[oa]|vitrine|open\s*box|renewed|refurbished|trocafone|trocafy|olx|enjoei)\b/iu';
+        $usedPattern = '/\b(usad[oa]s?|recondicionad[oa]s?|seminov[oa]s?|como\s+nov[oa]|vitrine|open\s*box|renewed|refurbished|trocafone|trocafy|olx|enjoei|cellularstore)\b/iu';
         if (preg_match($usedPattern, $text, $usedMatch) && ! preg_match($usedPattern, $productName)) {
             return CandidateValidationResult::reject("Anúncio de produto usado/recondicionado ('{$usedMatch[1]}').");
+        }
+
+        // Nota de conservação de loja de seminovos ("... - Muito Bom - ...", "- Excelente")
+        if (preg_match('/-\s*(excelente|muito\s+bom|bom)\s*(?:-|$)/iu', $title, $gradeMatch)) {
+            return CandidateValidationResult::reject("Anúncio de produto usado com nota de conservação ('{$gradeMatch[1]}').");
         }
 
         // 0.25 Acessório, jogo ou peça avulsa do produto (ex.: "Capinha Galaxy S25", "Jogo ... Switch 2 Edition")
