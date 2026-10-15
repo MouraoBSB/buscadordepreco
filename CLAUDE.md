@@ -27,8 +27,14 @@ Diretrizes do Laravel Boost (já instalado): @AGENTS.md
   voltagem e termos de busca).
 - `app/Services/Coupons`: cupons capturados de grupos de WhatsApp.
 - `app/Services/Alerts`: avaliação e envio de alertas.
-- `app/Services/Shopping`: **Fase 0**, com `SerperShoppingClient`, `OfferPageVerifier` e
-  `ShoppingOffer`. Comando: `pricewatch:probe`.
+- `app/Services/Shopping`: busca no Google Shopping.
+  - `SerperShoppingClient`: busca as ofertas.
+  - `ShoppingOfferMatcher`: aceita ou recusa cada oferta e marca preço suspeito abaixo de 60%
+    da mediana.
+  - `OfferPageVerifier`: checagem ao vivo opcional.
+  - Comando: `pricewatch:probe {query?} --products --verify -v`.
+- `CandidateValidator::validateListing()`: valida a identidade sem depender da URL; é usado
+  pela descoberta e pelo Shopping.
 
 ## Diagnóstico: por que a V1/V2 não entregou
 1. **Tavily não serve para e-commerce em tempo real:** devolve páginas antigas, categorias,
@@ -44,7 +50,24 @@ Diretrizes do Laravel Boost (já instalado): @AGENTS.md
 Painel, banco e filas funcionam. O que falhou foi a base: **achar a oferta certa com preço
 real**. WhatsApp, parser de cupons e auditoria foram construídos cedo demais.
 
-## Decisão vigente: Fase 0 (validar a premissa)
+## Decisão vigente (2026-10-14): preço do Google Shopping como fonte de verdade
+O objetivo é encontrar preços e promoções reais, de forma legal e barata; o "como" é
+flexível. A checagem ao vivo nas grandes lojas se mostrou inviável (403), então:
+1. O preço vem do Google Shopping via Serper. O Merchant Center exige que o preço do anúncio
+   bata com o da página da loja.
+2. Filtro de identidade antes de aceitar uma oferta: código do modelo, variantes erradas,
+   usados ou recondicionados.
+3. Link da oferta: o próprio link do Google Shopping, sem a busca extra com `site:`.
+4. Depois: gravar no histórico existente e detectar promoção (abaixo da meta ou da média).
+5. Depois: ampliar o leitor de grupos de WhatsApp para capturar ofertas, não só cupons.
+6. Afiliados por último: Lomadee primeiro. A API de produtos da Amazon foi substituída em
+   2026 e a nova exige vendas; a busca pública do Mercado Livre devolve 403.
+
+Custo estimado: o endpoint `/shopping` cobra **2 créditos por busca**. Para 10 produtos com
+4 rodadas por dia, são cerca de 2.400 créditos por mês, uns US$ 2,40 por mês após os 2.500
+grátis (cerca de US$ 1 por 1.000, créditos expiram em 6 meses).
+
+## Histórico: Fase 0 original (validar a premissa)
 - **Não** criar telas, **não** gravar no banco e **não** mexer em integrações periféricas
   enquanto a Fase 0 não terminar.
 - Fonte: Google Shopping real via Serper.dev (catálogo estruturado com preços atuais).
@@ -112,10 +135,33 @@ real**. WhatsApp, parser de cupons e auditoria foram construídos cedo demais.
   - A resolução de URL às vezes cai em outra loja ou outro país (Leroy Merlin → Shopee,
     Desertcart → homedepot.com, samsung.com/us).
   - Na prática, nenhuma oferta certa foi confirmada ao vivo.
+- **Mudança de rota aprovada pelo usuário:** o objetivo é achar preço e promoção, de forma
+  legal e barata. O preço do Google Shopping passa a ser a fonte de verdade (ver "Decisão
+  vigente").
+- Passos 2 e 3 implementados:
+  - `CandidateValidator::validateListing()`, com regras novas: variante (ultra/plus/+/edge/
+    pro/max/mini/lite/fe), usado/seminovo/"como novo"/lojas de usados, kit/combo e
+    armazenamento em GB ignorando RAM.
+  - Correção na regra de versão, que confundia "18 kg" com versão 18.
+  - Palavras de categoria de lavadora entraram na lista de palavras genéricas.
+  - `ShoppingOfferMatcher` e link do Google, montado pelo `productId` quando o Serper não
+    devolve o link.
+  - A checagem ao vivo ficou opcional (`--verify`).
+  - 40/40 testes passando.
+- Probe real com o filtro (6 + 2 créditos):
+
+  | Busca | No Shopping | Aceitas | Recusadas | Menor preço aceito |
+  |---|---|---|---|---|
+  | Midea MA512W165 | 14 | 2 | 12 | R$ 2.114,10 (Info Store) |
+  | Panasonic NA-F180P7 | 1 | 1 | 0 | R$ 2.799,00 (Pontofrio) |
+  | Samsung WA17CG6746 | 3 | 1 | 2 | R$ 2.626,59 (Shopee) |
+  | galaxy s25 256gb | 40 | 6 | 34 | R$ 3.038,23 (Magalu) |
+
+  Todas as aceitas têm link. As recusadas são variantes, usados, kits ou outras capacidades.
+- Créditos Serper gastos até agora: cerca de 46 de 2.500.
 - Pendências:
-  - Decidir a fonte de verdade do preço: Google Shopping (o Merchant Center exige preço
-    correto), checagem ao vivo ou APIs de afiliados (Amazon, Mercado Livre, Awin/Magalu).
-  - Filtrar identidade (código do modelo, variante) antes de gastar crédito na verificação.
-  - Ler o preço da Amazon pelo HTML (`a-price-whole`), como já faz o
-    `GenericJsonLdCollector`.
-  - Definir o critério numérico de "seguir ou encerrar".
+  - Passo 4: gravar as ofertas aceitas no histórico (`price_observations` ou estrutura
+    nova; conferir o schema antes) e alertar abaixo da meta ou da média, rodando pelo
+    scheduler.
+  - Verificar num navegador se o link montado pelo `productId` abre a oferta certa.
+  - Definir o critério numérico de "seguir ou encerrar", que pode já estar respondido.

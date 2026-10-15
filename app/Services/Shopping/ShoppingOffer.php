@@ -18,6 +18,7 @@ class ShoppingOffer
         public readonly ?float $price,
         public readonly ?string $googleProductId = null,
         public readonly ?string $imageUrl = null,
+        public readonly ?string $googleLink = null,
     ) {}
 
     /**

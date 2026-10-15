@@ -10,6 +10,8 @@ namespace App\Console\Commands;
 use App\Models\Product;
 use App\Services\Shopping\OfferPageVerifier;
 use App\Services\Shopping\SerperShoppingClient;
+use App\Services\Shopping\ShoppingOffer;
+use App\Services\Shopping\ShoppingOfferMatcher;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 
@@ -23,19 +25,20 @@ class ProbeOffersCommand extends Command
     protected $signature = 'pricewatch:probe
         {query? : Termo de busca livre (ex: "galaxy s25 256gb")}
         {--products : Usa os produtos ativos cadastrados em vez de um termo livre}
-        {--limit=8 : Máximo de ofertas verificadas ao vivo por busca (cada uma gasta 1 crédito)}';
+        {--verify : Também abre a página da loja das ofertas aceitas (1 crédito extra por oferta; lojas com anti-bot falham)}
+        {--limit=5 : Máximo de ofertas aceitas verificadas ao vivo com --verify}';
 
     /**
      * Descrição do comando.
      *
      * @var string
      */
-    protected $description = 'Fase 0: busca ofertas reais no Google Shopping (Serper) e confere cada link ao vivo na loja';
+    protected $description = 'Busca ofertas no Google Shopping (Serper), filtra as que são o produto certo e mostra o menor preço';
 
     /**
      * Executa o comando.
      */
-    public function handle(SerperShoppingClient $serper, OfferPageVerifier $verifier): int
+    public function handle(SerperShoppingClient $serper, ShoppingOfferMatcher $matcher, OfferPageVerifier $verifier): int
     {
         if (! $serper->isConfigured()) {
             $this->error('SERPER_API_KEY não configurada no .env.');
@@ -43,108 +46,157 @@ class ProbeOffersCommand extends Command
             return self::FAILURE;
         }
 
-        $queries = $this->resolveQueries();
+        $products = $this->resolveProducts();
 
-        if ($queries === []) {
+        if ($products === []) {
             $this->error('Informe um termo de busca ou use --products.');
 
             return self::FAILURE;
         }
 
-        $limit = max(1, (int) $this->option('limit'));
         $summary = [];
 
-        foreach ($queries as $query) {
-            $summary[$query] = $this->probeQuery($query, $limit, $serper, $verifier);
+        foreach ($products as $product) {
+            $summary[] = $this->probeProduct($product, $serper, $matcher, $verifier);
         }
 
         $this->newLine();
         $this->info('Resumo');
-        $this->table(
-            ['Busca', 'Ofertas no Shopping', 'Verificadas', 'Confirmadas', 'Preço diferente', 'Bloqueadas', 'Quebradas/indisp.'],
-            collect($summary)->map(fn (array $counts, string $query): array => [
-                Str::limit($query, 40),
-                $counts['listed'],
-                $counts['checked'],
-                $counts[OfferPageVerifier::Confirmed] ?? 0,
-                $counts[OfferPageVerifier::PriceDiffers] ?? 0,
-                $counts[OfferPageVerifier::Blocked] ?? 0,
-                ($counts[OfferPageVerifier::Broken] ?? 0) + ($counts[OfferPageVerifier::OutOfStock] ?? 0),
-            ])->values()->all(),
-        );
+        $this->table(['Busca', 'No Shopping', 'Aceitas', 'Suspeitas', 'Recusadas', 'Menor preço aceito', 'Loja'], $summary);
         $this->line("Créditos Serper usados: {$serper->creditsUsed}");
 
         return self::SUCCESS;
     }
 
     /**
-     * @return array<int, string>
+     * Produtos ativos cadastrados ou um produto transitório (não salvo) montado a partir do termo livre.
+     *
+     * @return array<int, Product>
      */
-    protected function resolveQueries(): array
+    protected function resolveProducts(): array
     {
         if ($this->option('products')) {
-            return Product::query()
-                ->where('active', true)
-                ->get()
-                ->map(function (Product $product): string {
-                    $query = $product->name;
-                    $modelCode = (string) $product->model_code;
-
-                    if (preg_match('/\d/', $modelCode) && ! Str::contains($query, $modelCode, ignoreCase: true)) {
-                        $query .= ' '.$modelCode;
-                    }
-
-                    return $query;
-                })
-                ->all();
+            return Product::query()->where('active', true)->get()->all();
         }
 
         $query = trim((string) $this->argument('query'));
 
-        return $query === '' ? [] : [$query];
+        return $query === '' ? [] : [new Product(['name' => $query, 'active' => true])];
+    }
+
+    protected function searchQueryFor(Product $product): string
+    {
+        $query = $product->name;
+        $modelCode = (string) $product->model_code;
+
+        if (preg_match('/\d/', $modelCode) && ! Str::contains($query, $modelCode, ignoreCase: true)) {
+            $query .= ' '.$modelCode;
+        }
+
+        return $query;
     }
 
     /**
-     * @return array<string, int>
+     * @return array<int, string|int>
      */
-    protected function probeQuery(string $query, int $limit, SerperShoppingClient $serper, OfferPageVerifier $verifier): array
+    protected function probeProduct(Product $product, SerperShoppingClient $serper, ShoppingOfferMatcher $matcher, OfferPageVerifier $verifier): array
     {
+        $query = $this->searchQueryFor($product);
+
         $this->newLine();
         $this->info("Busca: \"{$query}\"");
 
-        $offers = $serper->searchOffers($query);
-        $counts = ['listed' => count($offers), 'checked' => 0];
+        $results = $matcher->match($product, $serper->searchOffers($query));
 
-        if ($offers === []) {
-            $this->warn('  Nenhuma oferta no Google Shopping.');
+        $kept = collect($results)
+            ->reject(fn (array $result): bool => $result['status'] === ShoppingOfferMatcher::Rejected)
+            ->sortBy(fn (array $result): float => $result['offer']->price)
+            ->values();
+        $rejected = collect($results)->where('status', ShoppingOfferMatcher::Rejected)->values();
 
-            return $counts;
+        if ($kept->isEmpty()) {
+            $this->warn('  Nenhuma oferta do produto certo no Google Shopping.');
+        } else {
+            $this->renderKeptOffers($kept->all(), $serper, $verifier);
         }
 
+        if ($rejected->isNotEmpty()) {
+            if ($this->output->isVerbose()) {
+                $this->table(['Loja recusada', 'Título', 'Preço', 'Motivo'], $rejected->map(fn (array $result): array => [
+                    Str::limit($result['offer']->storeName, 18),
+                    Str::limit($result['offer']->title, 45),
+                    $this->formatPrice($result['offer']->price),
+                    $result['reason'],
+                ])->all());
+            } else {
+                $this->line("  {$rejected->count()} ofertas recusadas (use -v para ver os motivos).");
+            }
+        }
+
+        $best = $kept->firstWhere('status', ShoppingOfferMatcher::Accepted);
+
+        return [
+            Str::limit($query, 40),
+            count($results),
+            $kept->where('status', ShoppingOfferMatcher::Accepted)->count(),
+            $kept->where('status', ShoppingOfferMatcher::Suspicious)->count(),
+            $rejected->count(),
+            $best ? $this->formatPrice($best['offer']->price) : '-',
+            $best ? Str::limit($best['offer']->storeName, 18) : '-',
+        ];
+    }
+
+    /**
+     * @param  array<int, array{offer: ShoppingOffer, status: string, reason: string|null}>  $kept
+     */
+    protected function renderKeptOffers(array $kept, SerperShoppingClient $serper, OfferPageVerifier $verifier): void
+    {
+        $verify = (bool) $this->option('verify');
+        $verifyLimit = max(1, (int) $this->option('limit'));
+        $verified = 0;
         $rows = [];
 
-        foreach (array_slice($offers, 0, $limit) as $offer) {
-            $url = $serper->findStoreUrl($offer);
-            $verification = $url !== null
-                ? $verifier->verify($url, $offer->price)
-                : ['status' => 'sem_link', 'page_price' => null, 'http_status' => null, 'in_stock' => null];
-
-            $counts['checked']++;
-            $counts[$verification['status']] = ($counts[$verification['status']] ?? 0) + 1;
-
-            $rows[] = [
+        foreach ($kept as $result) {
+            $offer = $result['offer'];
+            $row = [
                 Str::limit($offer->storeName, 18),
                 Str::limit($offer->title, 45),
                 $this->formatPrice($offer->price),
-                $this->formatPrice($verification['page_price']),
-                $verification['status'].($verification['http_status'] && $verification['http_status'] !== 200 ? " ({$verification['http_status']})" : ''),
-                $url ?? '-',
+                $result['status'] === ShoppingOfferMatcher::Suspicious ? "suspeita: {$result['reason']}" : 'aceita',
             ];
+
+            if ($verify) {
+                $row[] = $result['status'] === ShoppingOfferMatcher::Accepted && $verified++ < $verifyLimit
+                    ? $this->verifyOnStore($offer, $serper, $verifier)
+                    : '-';
+            }
+
+            $row[] = $offer->googleLink ?? '-';
+            $rows[] = $row;
         }
 
-        $this->table(['Loja', 'Título', 'Preço Google', 'Preço na página', 'Status', 'Link'], $rows);
+        $headers = ['Loja', 'Título', 'Preço Google', 'Status'];
+        if ($verify) {
+            $headers[] = 'Na loja';
+        }
+        $headers[] = 'Link';
 
-        return $counts;
+        $this->table($headers, $rows);
+    }
+
+    protected function verifyOnStore(ShoppingOffer $offer, SerperShoppingClient $serper, OfferPageVerifier $verifier): string
+    {
+        $url = $serper->findStoreUrl($offer);
+
+        if ($url === null) {
+            return 'sem_link';
+        }
+
+        $verification = $verifier->verify($url, $offer->price);
+        $httpStatus = $verification['http_status'] && $verification['http_status'] !== 200 ? " ({$verification['http_status']})" : '';
+        $pagePrice = $verification['page_price'] !== null ? ' '.$this->formatPrice($verification['page_price']) : '';
+
+        return $verification['status'].$httpStatus.$pagePrice;
     }
 
     protected function formatPrice(?float $price): string

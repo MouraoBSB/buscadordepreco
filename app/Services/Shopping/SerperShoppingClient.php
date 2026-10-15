@@ -80,10 +80,29 @@ class SerperShoppingClient
                 price: ShoppingOffer::parseBrazilianPrice($result['price'] ?? null),
                 googleProductId: $result['productId'] ?? null,
                 imageUrl: $result['imageUrl'] ?? null,
+                googleLink: $result['link'] ?? $this->googleLinkFromProductId($result['productId'] ?? null, $title),
             );
         }
 
         return $offers;
+    }
+
+    /**
+     * Monta o link do painel do Google Shopping quando o Serper não devolve "link" (o productId é o catalogid).
+     */
+    protected function googleLinkFromProductId(?string $productId, string $title): ?string
+    {
+        if ($productId === null || $productId === '') {
+            return null;
+        }
+
+        return 'https://www.google.com/search?'.http_build_query([
+            'ibp' => 'oshop',
+            'q' => $title,
+            'prds' => "catalogid:{$productId},pvt:hg",
+            'gl' => 'br',
+            'udm' => 28,
+        ]);
     }
 
     public function domainForStore(string $storeName): ?string

@@ -7,8 +7,11 @@
 
 namespace Tests\Feature;
 
+use App\Models\Product;
 use App\Services\Shopping\OfferPageVerifier;
+use App\Services\Shopping\SerperShoppingClient;
 use App\Services\Shopping\ShoppingOffer;
+use App\Services\Shopping\ShoppingOfferMatcher;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -30,7 +33,93 @@ class ProbeOffersCommandTest extends TestCase
         $this->assertNull(ShoppingOffer::parseBrazilianPrice(null));
     }
 
-    public function test_probe_confirms_offer_whose_live_page_price_matches_google(): void
+    public function test_matcher_keeps_only_the_monitored_product_and_flags_outlier_prices(): void
+    {
+        $product = new Product(['name' => 'Samsung Galaxy S25 256GB']);
+
+        $offers = [
+            'certa' => new ShoppingOffer('Samsung Galaxy S25 5G 256GB', 'KaBuM!', 3899.00),
+            'ram' => new ShoppingOffer('Celular Samsung Galaxy S25 5G 12GB RAM', 'Amazon.com.br', 3999.00),
+            'ultra' => new ShoppingOffer('Smartphone Samsung Galaxy S25 Ultra 256GB', 'Magalu', 6999.00),
+            'mais' => new ShoppingOffer('Samsung Galaxy S25+ 5G 256GB', 'Magalu', 4999.00),
+            'usado' => new ShoppingOffer('Celular Samsung Galaxy S25 256GB', 'Amazon.com.br - Seminovos', 3675.00),
+            'armazenamento' => new ShoppingOffer('Samsung Galaxy S25 512GB', 'Casas Bahia', 4299.00),
+            'como_novo' => new ShoppingOffer('Galaxy S25 256GB Azul Marinho - Sou Como Novo', 'Trocafy', 3133.71),
+            'kit' => new ShoppingOffer('Smartphone Samsung Galaxy S25 256GB - 5G + Smartwatch Galaxy Watch8', 'Magalu', 5228.99),
+            'barato' => new ShoppingOffer('Samsung Galaxy S25 256GB Azul', 'Loja Desconhecida', 1500.00),
+            'sem_preco' => new ShoppingOffer('Samsung Galaxy S25 256GB', 'Fast Shop', null),
+        ];
+
+        $results = array_combine(array_keys($offers), app(ShoppingOfferMatcher::class)->match($product, array_values($offers)));
+
+        $this->assertSame(ShoppingOfferMatcher::Accepted, $results['certa']['status']);
+        $this->assertSame(ShoppingOfferMatcher::Accepted, $results['ram']['status']);
+        $this->assertSame(ShoppingOfferMatcher::Suspicious, $results['barato']['status']);
+
+        foreach (['ultra', 'mais', 'usado', 'armazenamento', 'sem_preco', 'como_novo', 'kit'] as $key) {
+            $this->assertSame(ShoppingOfferMatcher::Rejected, $results[$key]['status'], "Oferta '{$key}' deveria ser recusada.");
+        }
+
+        $this->assertStringContainsString('ultra', $results['ultra']['reason']);
+        $this->assertStringContainsString('Armazenamento', $results['armazenamento']['reason']);
+    }
+
+    public function test_matcher_does_not_mistake_capacity_for_product_version(): void
+    {
+        $product = new Product([
+            'name' => 'Lavadora de Roupas Panasonic 18 kg Titânio Top Load',
+            'brand' => 'Panasonic',
+            'capacity_kg' => 18,
+        ]);
+
+        [$result] = app(ShoppingOfferMatcher::class)->match($product, [
+            new ShoppingOffer('Máquina de Lavar Panasonic Antibacteria 18kg Titânio', 'Extra', 2799.00),
+        ]);
+
+        $this->assertSame(ShoppingOfferMatcher::Accepted, $result['status'], (string) $result['reason']);
+    }
+
+    public function test_builds_google_link_from_product_id_when_serper_omits_it(): void
+    {
+        Http::fake([
+            'google.serper.dev/shopping' => Http::response([
+                'shopping' => [
+                    ['title' => 'Samsung Galaxy S25 5G 256GB', 'source' => 'Horizon Play', 'price' => 'R$ 4.250,29', 'productId' => '11165022278430168481'],
+                ],
+                'credits' => 2,
+            ]),
+        ]);
+
+        [$offer] = app(SerperShoppingClient::class)->searchOffers('galaxy s25');
+
+        $this->assertStringStartsWith('https://www.google.com/search?ibp=oshop&', $offer->googleLink);
+        $this->assertStringContainsString('prds=catalogid%3A11165022278430168481', $offer->googleLink);
+    }
+
+    public function test_probe_shows_cheapest_matching_offer_with_google_link_using_a_single_search(): void
+    {
+        Http::fake([
+            'google.serper.dev/shopping' => Http::response([
+                'shopping' => [
+                    ['title' => 'Samsung Galaxy S25 Ultra 256GB', 'source' => 'Magalu', 'price' => 'R$ 2.625,65 agora', 'link' => 'https://www.google.com/search?ibp=oshop&prds=ultra'],
+                    ['title' => 'Samsung Galaxy S25 5G 256GB', 'source' => 'Amazon.com.br', 'price' => 'R$ 3.999,00 agora', 'link' => 'https://www.google.com/search?ibp=oshop&prds=amazon'],
+                    ['title' => 'Samsung Galaxy S25 5G 256GB', 'source' => 'KaBuM!', 'price' => 'R$ 3.899,00 agora', 'link' => 'https://www.google.com/search?ibp=oshop&prds=kabum'],
+                ],
+                'credits' => 2,
+            ]),
+        ]);
+
+        $this->artisan('pricewatch:probe', ['query' => 'samsung galaxy s25 256gb'])
+            ->expectsOutputToContain('https://www.google.com/search?ibp=oshop&prds=kabum')
+            ->expectsOutputToContain('1 ofertas recusadas')
+            ->expectsOutputToContain('R$ 3.899,00')
+            ->expectsOutputToContain('Créditos Serper usados: 2')
+            ->assertSuccessful();
+
+        Http::assertSentCount(1);
+    }
+
+    public function test_probe_with_verify_confirms_offer_on_the_store_page(): void
     {
         Http::fake([
             'google.serper.dev/shopping' => Http::response([
@@ -49,8 +138,8 @@ class ProbeOffersCommandTest extends TestCase
             'www.kabum.com.br/*' => Http::response($this->productPageHtml(3899.00, 'InStock')),
         ]);
 
-        $this->artisan('pricewatch:probe', ['query' => 'galaxy s25'])
-            ->expectsOutputToContain('confirmado | https://www.kabum.com.br/produto/703055/galaxy-s25 |')
+        $this->artisan('pricewatch:probe', ['query' => 'samsung galaxy s25 256gb', '--verify' => true])
+            ->expectsOutputToContain('confirmado R$ 3.899,00')
             ->expectsOutputToContain('Créditos Serper usados: 3')
             ->assertSuccessful();
 

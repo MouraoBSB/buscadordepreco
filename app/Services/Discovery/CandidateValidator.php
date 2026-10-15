@@ -12,18 +12,39 @@ class CandidateValidator
      */
     public function validate(Product $product, RawCandidateDto $candidate): CandidateValidationResult
     {
-        $text = mb_strtolower($candidate->title.' '.($candidate->snippet ?? ''), 'UTF-8');
-        $matches = [];
-
         // 0. Filter out Search and Category listing URLs (Amazon /s?, Casas Bahia /b, Magalu /busca)
         $urlLower = strtolower($candidate->url);
         if (preg_match('/(\/s\?|\/s\/|\/busca|\/search|\/categoria|\/departamento|\/lista|\/c\/|\/ofertas|\/b$|\/b\/)/', $urlLower)) {
             return CandidateValidationResult::reject('URL é página de busca ou listagem de categoria, não anúncio individual de produto.');
         }
 
+        return $this->validateListing($product, $candidate->title, $candidate->snippet, $candidate->getDomain());
+    }
+
+    /**
+     * Valida a identidade de um anúncio (título e texto auxiliar) contra o produto, sem depender da URL.
+     */
+    public function validateListing(Product $product, string $title, ?string $extraText = null, string $domain = ''): CandidateValidationResult
+    {
+        $text = mb_strtolower($title.' '.($extraText ?? ''), 'UTF-8');
+        $productName = mb_strtolower(($product->commercial_name ?: '').' '.$product->name, 'UTF-8');
+        $matches = [];
+
         // 0.1 Filter out clearly Out-of-Stock results from search snippets/titles
         if (preg_match('/\b(esgotado|indispon[íi]vel|sem\s+estoque|fora\s+de\s+estoque|avise-me\s+quando\s+chegar)\b/iu', $text)) {
             return CandidateValidationResult::reject('Anúncio identificado como esgotado ou indisponível.');
+        }
+
+        // 0.2 Usado, recondicionado ou vitrine só passa se o próprio produto for assim
+        $usedPattern = '/\b(usad[oa]s?|recondicionad[oa]s?|seminov[oa]s?|como\s+nov[oa]|vitrine|open\s*box|renewed|refurbished|trocafone|trocafy|olx|enjoei)\b/iu';
+        if (preg_match($usedPattern, $text, $usedMatch) && ! preg_match($usedPattern, $productName)) {
+            return CandidateValidationResult::reject("Anúncio de produto usado/recondicionado ('{$usedMatch[1]}').");
+        }
+
+        // 0.3 Kit ou combo com outro produto (ex.: "S25 + Smartwatch") distorce o preço
+        $bundlePattern = '/(\s\+\s*\p{L})|\b(kit|combo)\b/iu';
+        if (preg_match($bundlePattern, $title) && ! preg_match($bundlePattern, $productName)) {
+            return CandidateValidationResult::reject('Anúncio é kit/combo com outro produto.');
         }
 
         // 1. Core Subject Relevance Check (must match brand, model, or identifying commercial keywords)
@@ -31,9 +52,16 @@ class CandidateValidator
             return CandidateValidationResult::reject('Título do anúncio não possui correspondência com o produto monitorado (marca ou termos principais ausentes).');
         }
 
+        // 1.2 Variante diferente da monitorada (ex.: S25 Ultra/S25+ quando o produto é o S25)
+        $variant = $this->findForeignVariant($productName, mb_strtolower($title, 'UTF-8'));
+        if ($variant !== null) {
+            return CandidateValidationResult::reject("Variante incompatível: anúncio é '{$variant}', ausente no produto monitorado.");
+        }
+
         // 1.1 Generation / Version Check (e.g. Switch 2 vs Switch 1, PS5 vs PS4)
         $nameForVersion = $product->commercial_name ?: $product->name;
-        if (preg_match('/\b([a-zA-Z]+)\s*(\d{1,2})\b/u', $nameForVersion, $mVersion)) {
+        // Números seguidos de unidade ("18 kg", "16,5 kg", "220V") são medida, não versão
+        if (preg_match('/\b([a-zA-Z]+)\s*(\d{1,2})\b(?![.,]\d|\s*(?:kg|g|l|litros|w|v|gb|tb|mm|cm|pol|polegadas)\b|\s*")/iu', $nameForVersion, $mVersion)) {
             $wordPrefix = mb_strtolower($mVersion[1], 'UTF-8');
             $verNum = $mVersion[2];
 
@@ -103,6 +131,20 @@ class CandidateValidator
                 if ($hasMatchingCapacity) {
                     $matches['capacity_confirmed'] = true;
                 }
+            }
+        }
+
+        // Armazenamento (GB/TB) declarado no nome do produto; valores seguidos de "RAM" são ignorados
+        $expectedStorage = $this->extractStorageValues($productName);
+        if ($expectedStorage !== []) {
+            $foundStorage = $this->extractStorageValues($text);
+
+            if ($foundStorage !== [] && array_intersect($expectedStorage, $foundStorage) === []) {
+                return CandidateValidationResult::reject('Armazenamento incompatível: anúncio menciona '.implode('GB, ', $foundStorage).'GB, esperado '.implode('GB, ', $expectedStorage).'GB.');
+            }
+
+            if ($foundStorage !== []) {
+                $matches['storage_confirmed'] = true;
             }
         }
 
@@ -178,7 +220,7 @@ class CandidateValidator
         // 5. Brand Check & Conflicting Brand Detection
         if ($product->brand) {
             $brandLower = mb_strtolower($product->brand, 'UTF-8');
-            if (str_contains($text, $brandLower) || str_contains(mb_strtolower($candidate->getDomain(), 'UTF-8'), $brandLower)) {
+            if (str_contains($text, $brandLower) || str_contains(mb_strtolower($domain, 'UTF-8'), $brandLower)) {
                 $matches['brand_matched'] = true;
             } else {
                 // If candidate title mentions a different known competing brand, reject as brand conflict
@@ -190,7 +232,7 @@ class CandidateValidator
                     'engwe', 'nexor', 'caloi', 'sense', 'ogawa',
                 ];
                 foreach ($competingBrands as $cb) {
-                    if ($cb !== $brandLower && preg_match('/\b'.preg_quote($cb, '/').'\b/iu', $candidate->title)) {
+                    if ($cb !== $brandLower && preg_match('/\b'.preg_quote($cb, '/').'\b/iu', $title)) {
                         return CandidateValidationResult::reject("Marca incompatível: anúncio pertence à marca '".ucfirst($cb)."', esperado '".ucfirst($product->brand)."'.");
                     }
                 }
@@ -215,6 +257,7 @@ class CandidateValidator
         'bivolt', '220v', '127v', '110v', 'volts', 'volt', 'litros', 'quilos', 'polegadas', 'pol', 'cor',
         'bicicleta', 'bike', 'ebike', 'bicicletas', 'bikes',
         'lavadora', 'maquina', 'máquina', 'lava', 'seca', 'secadora', 'lavadoras',
+        'lavar', 'roupa', 'roupas', 'top', 'load', 'front',
         'geladeira', 'refrigerador', 'freezer', 'geladeiras',
         'fogao', 'fogão', 'cooktop', 'forno', 'microondas', 'micro-ondas',
         'tv', 'smart', 'televisao', 'televisão', 'televisor', 'televisores',
@@ -299,6 +342,49 @@ class CandidateValidator
         }
 
         return $matched;
+    }
+
+    /**
+     * Retorna a variante presente no anúncio e ausente no produto (ultra, plus, edge, "+" etc.).
+     */
+    protected function findForeignVariant(string $productName, string $title): ?string
+    {
+        foreach (['ultra', 'plus', 'edge', 'pro', 'max', 'mini', 'lite', 'fe'] as $variant) {
+            $pattern = '/\b'.$variant.'\b/u';
+            if (preg_match($pattern, $title) && ! preg_match($pattern, $productName)) {
+                return $variant;
+            }
+        }
+
+        // Sufixo "+" colado ao modelo, como "S25+"
+        $plusPattern = '/[a-z0-9]\+(?![a-z0-9])/u';
+        if (preg_match($plusPattern, $title) && ! preg_match($plusPattern, $productName) && ! preg_match('/\bplus\b/u', $productName)) {
+            return '+';
+        }
+
+        return null;
+    }
+
+    /**
+     * Extrai capacidades de armazenamento em GB (TB convertido), ignorando memória RAM e valores pequenos.
+     *
+     * @return array<int, int>
+     */
+    protected function extractStorageValues(string $text): array
+    {
+        if (! preg_match_all('/\b(\d{1,4})\s*(gb|tb)\b(?!\s*(?:de\s+)?ram)/iu', $text, $found, PREG_SET_ORDER)) {
+            return [];
+        }
+
+        $values = [];
+        foreach ($found as $match) {
+            $gigabytes = (int) $match[1] * (strtolower($match[2]) === 'tb' ? 1024 : 1);
+            if ($gigabytes >= 32) {
+                $values[] = $gigabytes;
+            }
+        }
+
+        return array_values(array_unique($values));
     }
 
     /**
