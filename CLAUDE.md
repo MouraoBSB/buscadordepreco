@@ -100,6 +100,35 @@ grátis (cerca de US$ 1 por 1.000, créditos expiram em 6 meses).
 
 ## Registro
 
+### 2026-10-14 (deploy em produção)
+- **Deploy feito por Claude** (o usuário sempre pede o deploy por aqui), seguindo o RUNBOOK:
+  `git pull`, `docker compose build app worker`, `up -d`, `migrate --force` e caches.
+  - O acesso SSH depende de uma regra de permissão do usuário no Claude Code:
+    `Bash(ssh -i ~/.ssh/id_pricewatch_deploy root@178.156.245.190:*)`. Os comandos
+    precisam **começar** com esse `ssh` para casar com a regra.
+- `.env` de produção:
+  - Backup em `.env.backup-20261015-003437`.
+  - Foram adicionados `SERPER_API_KEY`, `GOWA_ENABLED=false` e um `GOWA_WEBHOOK_SECRET`
+    aleatório. Antes não havia segredo, e valia o padrão público do `config/services.php`.
+    O GoWA precisará ser configurado com o segredo novo.
+- Primeira rodada em produção (6 produtos, 12 créditos): Midea, Panasonic, Samsung,
+  Switch 2, bike GT73 e Galaxy S25. 3 alertas `skipped` (Midea e Panasonic).
+- **Erros encontrados e corrigidos (`8ba8c75`):**
+  - Uma lava e seca Samsung de R$ 19.599 passou como a lavadora; `secadora` e
+    `lava e seca` viraram variantes recusadas.
+  - Com só 2 ofertas aceitas, a mediana marcou a lavadora correta como suspeita; o
+    critério de preço fora da curva agora exige 3 ou mais ofertas aceitas.
+  - Em produção, a observação da lava e seca foi marcada `is_mismatch` e a da Sipolatti
+    foi desmarcada como suspeita.
+- Pontos a observar nas próximas rodadas:
+  - Lojas estrangeiras no Shopping (Microless, Desertcart).
+  - O produto "Galaxy S25" em produção não tem armazenamento no nome, então aceita
+    qualquer capacidade.
+- O Kaspersky do usuário bloqueou o `claude.exe` (PDM:Trojan.Win32.Generic, detecção por
+  comportamento) quando ele iniciou o `php.exe` 8.3. Isso explica o erro
+  `EPERM uv_spawn 'php'` do MCP `laravel-boost`. O `claude.exe` tem assinatura válida da
+  Anthropic (MD5 `11DEAE9E...`).
+
 ### 2026-10-14 (passo 4: gravação automática e alertas)
 - **WhatsApp desligado de propósito:** o número foi compartilhado com outro projeto e
   quebrou os dois. O usuário vai providenciar um número exclusivo.
@@ -136,8 +165,9 @@ grátis (cerca de US$ 1 por 1.000, créditos expiram em 6 meses).
   - Ligar `GOWA_ENABLED=true` quando houver número exclusivo.
   - Decidir se a descoberta via Tavily (`pricewatch:discover`, terça e sexta) e a coleta
     HTTP (`pricewatch:collect`, diária) continuam agendadas.
-  - O `.env.example` contém um telefone real em `GOWA_RECIPIENT_PHONE`; avaliar trocar por
-    um valor fictício.
+  - ~~Telefone real no `.env.example`~~: trocado por um fictício. O repositório GitHub é
+    **público** e o número continua no histórico desde o commit inicial (`ccec28b`).
+  - ~~Deploy~~: feito (ver a entrada "deploy em produção").
   - Passo 5 (capturar ofertas de grupos de WhatsApp) depende do número novo.
 
 ### 2026-10-14
