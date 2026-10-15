@@ -24,6 +24,9 @@ class ShoppingOfferMatcher
     // Preço abaixo desta fração da mediana das ofertas aceitas é tratado como suspeito
     protected const float SuspiciousPriceRatio = 0.6;
 
+    // Com menos ofertas aceitas a mediana não indica qual preço está fora da curva
+    protected const int MinOffersForOutlierCheck = 3;
+
     public function __construct(protected CandidateValidator $validator) {}
 
     /**
@@ -44,14 +47,16 @@ class ShoppingOfferMatcher
                 : $this->result($offer, self::Rejected, $validation->rejectionReason);
         }, $offers);
 
-        $median = $this->median(array_map(
+        $acceptedPrices = array_map(
             fn (array $result): float => $result['offer']->price,
             array_filter($results, fn (array $result): bool => $result['status'] === self::Accepted),
-        ));
+        );
 
-        if ($median === null) {
+        if (count($acceptedPrices) < self::MinOffersForOutlierCheck) {
             return $results;
         }
+
+        $median = $this->median(array_values($acceptedPrices));
 
         return array_map(function (array $result) use ($median): array {
             if ($result['status'] === self::Accepted && $result['offer']->price < $median * self::SuspiciousPriceRatio) {

@@ -349,7 +349,7 @@ class CandidateValidator
      */
     protected function findForeignVariant(string $productName, string $title): ?string
     {
-        foreach (['ultra', 'plus', 'edge', 'pro', 'max', 'mini', 'lite', 'fe'] as $variant) {
+        foreach (['ultra', 'plus', 'edge', 'pro', 'max', 'mini', 'lite', 'fe', 'lava e seca', 'secadora'] as $variant) {
             $pattern = '/\b'.$variant.'\b/u';
             if (preg_match($pattern, $title) && ! preg_match($pattern, $productName)) {
                 return $variant;

@@ -79,6 +79,32 @@ class ProbeOffersCommandTest extends TestCase
         $this->assertSame(ShoppingOfferMatcher::Accepted, $result['status'], (string) $result['reason']);
     }
 
+    public function test_washer_rejects_washer_dryer_and_two_offers_are_not_judged_as_outliers(): void
+    {
+        $product = new Product([
+            'name' => 'Lavadora de Roupas Samsung 17 kg Ecobubble Top Load',
+            'brand' => 'Samsung',
+            'model_code' => 'WA17CG6746BVBZ',
+            'capacity_kg' => 17,
+        ]);
+
+        [$washerDryer, $washer] = app(ShoppingOfferMatcher::class)->match($product, [
+            new ShoppingOffer('Lavadora e Secadora Samsung Bespoke AI WH17D Laundy 17kg', 'shop.samsung.com/br', 19599.00),
+            new ShoppingOffer('Lavadora Samsung Smart Digital Inverter WA17CG Black 17kg', 'Sipolatti', 3499.00),
+        ]);
+
+        $this->assertSame(ShoppingOfferMatcher::Rejected, $washerDryer['status']);
+        $this->assertSame(ShoppingOfferMatcher::Accepted, $washer['status'], (string) $washer['reason']);
+
+        [$first, $second] = app(ShoppingOfferMatcher::class)->match($product, [
+            new ShoppingOffer('Lavadora Samsung WA17CG 17kg', 'Loja A', 3499.00),
+            new ShoppingOffer('Lavadora Samsung WA17CG 17kg', 'Loja B', 1800.00),
+        ]);
+
+        $this->assertSame(ShoppingOfferMatcher::Accepted, $first['status']);
+        $this->assertSame(ShoppingOfferMatcher::Accepted, $second['status']);
+    }
+
     public function test_falls_back_to_shopping_search_link_when_serper_omits_it(): void
     {
         Http::fake([
