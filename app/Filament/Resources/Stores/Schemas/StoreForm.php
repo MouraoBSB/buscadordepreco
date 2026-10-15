@@ -20,8 +20,8 @@ class StoreForm
 
                 TextInput::make('domain')
                     ->label('Domínio')
-                    ->required()
-                    ->placeholder('ex: mideastore.com.br')
+                    ->placeholder('ex: mideastore.com.br (vazio para lojas vistas só no Google Shopping)')
+                    ->dehydrateStateUsing(fn (?string $state): string => (string) $state)
                     ->maxLength(255),
 
                 Select::make('trust_level')
@@ -30,7 +30,9 @@ class StoreForm
                         'official' => 'Oficial / Loja Própria',
                         'marketplace_1p' => 'Marketplace 1P (Vendido e entregue pela rede)',
                         'marketplace_3p' => 'Marketplace 3P (Terceiros)',
+                        'standard' => 'Não verificada (encontrada automaticamente)',
                     ])
+                    ->helperText('Oficial e Marketplace 1P são consideradas confiáveis: o preço delas é o principal no painel e nos alertas.')
                     ->default('official')
                     ->required(),
 

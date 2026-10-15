@@ -39,6 +39,7 @@ class SerperShoppingClient
         'fast shop' => 'fastshop.com.br',
         'samsung' => 'samsung.com',
         'taqi' => 'taqi.com.br',
+        'havan' => 'havan.com.br',
         'americanas' => 'americanas.com.br',
         'submarino' => 'submarino.com.br',
         'shopee' => 'shopee.com.br',
@@ -81,25 +82,11 @@ class SerperShoppingClient
                 price: ShoppingOffer::parseBrazilianPrice($result['price'] ?? null),
                 googleProductId: $result['productId'] ?? null,
                 imageUrl: $result['imageUrl'] ?? null,
-                googleLink: $result['link'] ?? $this->googleShoppingSearchLink($title, $storeName),
+                googleLink: $result['link'] ?? null,
             );
         }
 
         return $offers;
-    }
-
-    /**
-     * Busca na aba Shopping pelo título exato e pela loja, usada quando o Serper não devolve "link".
-     * Montar o painel pelo productId não funciona: o Google exige o gpcid, que não vem na resposta.
-     */
-    protected function googleShoppingSearchLink(string $title, string $storeName): string
-    {
-        return 'https://www.google.com/search?'.http_build_query([
-            'q' => "{$title} {$storeName}",
-            'udm' => 28,
-            'gl' => 'br',
-            'hl' => 'pt-BR',
-        ]);
     }
 
     public function domainForStore(string $storeName): ?string

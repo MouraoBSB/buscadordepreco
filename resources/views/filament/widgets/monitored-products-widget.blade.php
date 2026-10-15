@@ -147,9 +147,19 @@
                         @endif
                     </div>
 
-                    <div style="margin-top: 1rem; padding-top: 0.5rem; border-top: 1px solid #f9fafb; display: flex; align-items: center; justify-content: space-between; font-size: 0.75rem; color: #6b7280;">
+                    @if ($product['unverified_offer'])
+                        <a href="{{ $product['unverified_offer']['url'] }}" target="_blank" rel="noopener noreferrer" style="margin-top: 0.75rem; display: flex; align-items: flex-start; gap: 0.375rem; padding: 0.5rem 0.625rem; border-radius: 0.5rem; background-color: #fffbeb; border: 1px solid #fde68a; color: #92400e; font-size: 0.6875rem; line-height: 1.3; text-decoration: none;" title="Abrir oferta em {{ $product['unverified_offer']['store'] }}">
+                            <span aria-hidden="true">⚠️</span>
+                            <span>
+                                <strong>R$ {{ number_format($product['unverified_offer']['price'], 2, ',', '.') }}</strong>
+                                em {{ $product['unverified_offer']['store'] }}: loja pouco conhecida, confira antes de comprar.
+                            </span>
+                        </a>
+                    @endif
+
+                    <div style="margin-top: 1rem; padding-top: 0.5rem; border-top: 1px solid #f9fafb; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; font-size: 0.75rem; color: #6b7280;">
                         <span>{{ $product['active_sources_count'] }} fonte(s) ativa(s)</span>
-                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <div style="display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 0.5rem;">
                             <x-filament::button
                                 size="xs"
                                 color="gray"
@@ -166,6 +176,12 @@
                                     <span>Ver Oferta</span>
                                     <x-filament::icon icon="heroicon-m-arrow-top-right-on-square" class="h-3.5 w-3.5" />
                                 </a>
+                                @if ($product['compare_url'])
+                                    <a href="{{ $product['compare_url'] }}" target="_blank" rel="noopener noreferrer" style="font-weight: 600; color: #475569; display: inline-flex; align-items: center; gap: 0.25rem; text-decoration: none; padding: 0.25rem 0.625rem; border-radius: 0.375rem; background-color: #f8fafc; border: 1px solid #e2e8f0;" class="hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-300 dark:border-gray-700" title="Abrir a página do produto no Google Shopping com todas as lojas">
+                                        <span>Comparar lojas</span>
+                                        <x-filament::icon icon="heroicon-m-scale" class="h-3.5 w-3.5" />
+                                    </a>
+                                @endif
                             @else
                                 <a href="{{ \App\Filament\Resources\DiscoveryCandidates\DiscoveryCandidateResource::getUrl('index', ['tableFilters' => ['product_id' => ['value' => $product['id']]]]) }}" style="font-weight: 500; color: #64748b; display: inline-flex; align-items: center; gap: 0.25rem; text-decoration: none; padding: 0.25rem 0.5rem;" title="Ver ofertas e candidatos">
                                     <span>Ver Ofertas</span>

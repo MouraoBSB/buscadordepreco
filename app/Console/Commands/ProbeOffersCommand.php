@@ -160,7 +160,7 @@ class ProbeOffersCommand extends Command
                     : '-';
             }
 
-            $row[] = $offer->googleLink ?? '-';
+            $row[] = $offer->storeSearchLink();
             $rows[] = $row;
         }
 

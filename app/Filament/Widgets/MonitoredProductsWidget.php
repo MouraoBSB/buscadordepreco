@@ -18,21 +18,34 @@ class MonitoredProductsWidget extends Widget
 
     protected int|string|array $columnSpan = 'full';
 
+    // Janela do "preço atual": a busca roda 4x ao dia, então 24h cobre as últimas rodadas
+    protected const int CurrentPriceWindowHours = 24;
+
     public function getProducts(): array
     {
         $products = Product::where('active', true)->get();
         $items = [];
 
         foreach ($products as $prod) {
-            // 1. Current in-stock price from active sources
-            $lowestInStockObs = PriceObservation::query()
+            // 1. Preço atual: observações recentes em estoque, com prioridade para loja confiável
+            $currentQuery = fn () => PriceObservation::query()
+                ->with('source.store')
                 ->whereHas('source', fn ($q) => $q->where('product_id', $prod->id)->where('active', true))
                 ->where('is_mismatch', false)
                 ->where('is_suspicious', false)
                 ->where('in_stock', true)
+                ->where('collected_at', '>=', now()->subHours(self::CurrentPriceWindowHours))
                 ->whereRaw('COALESCE(pix_price, regular_price) > 0')
-                ->orderByRaw('COALESCE(pix_price, regular_price) ASC')
-                ->first();
+                ->orderByRaw('COALESCE(pix_price, regular_price) ASC');
+
+            $lowestTrustedObs = $currentQuery()->whereHas('source.store', fn ($q) => $q->trusted())->first();
+            $lowestAnyObs = $currentQuery()->first();
+            $lowestInStockObs = $lowestTrustedObs ?? $lowestAnyObs;
+
+            // Oferta mais barata de loja não verificada vira aviso, sem substituir o preço principal
+            $unverifiedObs = $lowestTrustedObs && $lowestAnyObs && $lowestAnyObs->id !== $lowestTrustedObs->id
+                ? $lowestAnyObs
+                : null;
 
             // 2. Lowest historical price ever recorded (even if currently out of stock)
             $lowestHistoricalObs = PriceObservation::query()
@@ -77,6 +90,10 @@ class MonitoredProductsWidget extends Widget
                 if ($lowestHistoricalObs && (float) $lowestHistoricalObs->effective_price < $price) {
                     $histFormatted = number_format((float) $lowestHistoricalObs->effective_price, 2, ',', '.');
                     $priceSubtext = "Menor histórico: R$ {$histFormatted}";
+                }
+
+                if (! $lowestInStockObs->source?->store?->isTrusted()) {
+                    $priceSubtext = 'Loja pouco conhecida: confira antes de comprar';
                 }
             } elseif ($lowestHistoricalObs) {
                 $price = (float) $lowestHistoricalObs->effective_price;
@@ -179,6 +196,12 @@ class MonitoredProductsWidget extends Widget
                 'current_price' => $price,
                 'offer_url' => $offerUrl,
                 'offer_store' => $offerStore,
+                'compare_url' => ($lowestInStockObs ?? $winningObs)?->metadata['google_link'] ?? null,
+                'unverified_offer' => $unverifiedObs ? [
+                    'price' => (float) $unverifiedObs->effective_price,
+                    'store' => $unverifiedObs->source?->store?->name ?? $unverifiedObs->seller,
+                    'url' => $unverifiedObs->source?->url,
+                ] : null,
                 'price_type' => $priceType,
                 'price_label' => $priceLabel,
                 'price_badge' => $priceBadge,

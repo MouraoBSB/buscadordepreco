@@ -22,6 +22,19 @@ class ShoppingOffer
     ) {}
 
     /**
+     * Busca na aba Shopping pelo título exato e pela loja: abre a oferta desta loja em primeiro lugar.
+     */
+    public function storeSearchLink(): string
+    {
+        return 'https://www.google.com/search?'.http_build_query([
+            'q' => "{$this->title} {$this->storeName}",
+            'udm' => 28,
+            'gl' => 'br',
+            'hl' => 'pt-BR',
+        ]);
+    }
+
+    /**
      * Converte preços no formato brasileiro, como "R$ 3.163,13 agora", em float.
      */
     public static function parseBrazilianPrice(?string $rawPrice): ?float

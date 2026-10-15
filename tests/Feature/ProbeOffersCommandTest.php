@@ -129,23 +129,26 @@ class ProbeOffersCommandTest extends TestCase
         $this->assertSame(ShoppingOfferMatcher::Accepted, $second['status']);
     }
 
-    public function test_falls_back_to_shopping_search_link_when_serper_omits_it(): void
+    public function test_offer_keeps_google_panel_link_and_builds_store_search_link(): void
     {
         Http::fake([
             'google.serper.dev/shopping' => Http::response([
                 'shopping' => [
                     ['title' => 'Samsung Galaxy S25 5G 256GB', 'source' => 'Horizon Play', 'price' => 'R$ 4.250,29', 'productId' => '11165022278430168481'],
+                    ['title' => 'Samsung Galaxy S25 5G 256GB', 'source' => 'KaBuM!', 'price' => 'R$ 3.899,00', 'link' => 'https://www.google.com/search?ibp=oshop&prds=kabum'],
                 ],
                 'credits' => 2,
             ]),
         ]);
 
-        [$offer] = app(SerperShoppingClient::class)->searchOffers('galaxy s25');
+        [$withoutPanel, $withPanel] = app(SerperShoppingClient::class)->searchOffers('galaxy s25');
 
+        $this->assertNull($withoutPanel->googleLink);
         $this->assertSame(
             'https://www.google.com/search?q=Samsung+Galaxy+S25+5G+256GB+Horizon+Play&udm=28&gl=br&hl=pt-BR',
-            $offer->googleLink,
+            $withoutPanel->storeSearchLink(),
         );
+        $this->assertSame('https://www.google.com/search?ibp=oshop&prds=kabum', $withPanel->googleLink);
     }
 
     public function test_probe_shows_cheapest_matching_offer_with_google_link_using_a_single_search(): void
@@ -162,7 +165,7 @@ class ProbeOffersCommandTest extends TestCase
         ]);
 
         $this->artisan('pricewatch:probe', ['query' => 'samsung galaxy s25 256gb'])
-            ->expectsOutputToContain('https://www.google.com/search?ibp=oshop&prds=kabum')
+            ->expectsOutputToContain('q=Samsung+Galaxy+S25+5G+256GB+KaBuM%21')
             ->expectsOutputToContain('1 ofertas recusadas')
             ->expectsOutputToContain('R$ 3.899,00')
             ->expectsOutputToContain('Créditos Serper usados: 2')

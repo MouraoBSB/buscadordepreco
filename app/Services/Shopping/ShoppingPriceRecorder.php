@@ -22,6 +22,9 @@ use Illuminate\Support\Str;
  */
 class ShoppingPriceRecorder
 {
+    // Marketplaces conhecidos em que a maioria das ofertas é de vendedores terceiros
+    protected const array ThirdPartyMarketplaces = ['shopee.com.br'];
+
     public function __construct(
         protected SerperShoppingClient $serper,
         protected ShoppingOfferMatcher $matcher,
@@ -72,10 +75,12 @@ class ShoppingPriceRecorder
             ->map(fn (array $result): PriceObservation => $this->storeObservation($product, $result, $query, $collectedAt))
             ->all());
 
-        $best = collect($observations)
+        // Alerta usa a melhor oferta de loja confiável; sem nenhuma, a melhor de qualquer loja
+        $candidates = collect($observations)
             ->reject(fn (PriceObservation $observation): bool => $observation->is_suspicious)
-            ->sortBy(fn (PriceObservation $observation): float => (float) $observation->regular_price)
-            ->first();
+            ->sortBy(fn (PriceObservation $observation): float => (float) $observation->regular_price);
+        $best = $candidates->first(fn (PriceObservation $observation): bool => (bool) $observation->source->store?->isTrusted())
+            ?? $candidates->first();
 
         if ($best !== null) {
             try {
@@ -115,7 +120,7 @@ class ShoppingPriceRecorder
                 'collector_type' => ProductSource::CollectorGoogleShopping,
             ],
             [
-                'url' => $offer->googleLink ?? '',
+                'url' => $offer->storeSearchLink(),
                 'expected_model' => $product->model_code,
                 'expected_voltage' => $product->voltage ?: 'Bivolt',
                 'active' => true,
@@ -125,7 +130,7 @@ class ShoppingPriceRecorder
         );
 
         $source->update([
-            'url' => $offer->googleLink ?? $source->url,
+            'url' => $offer->storeSearchLink(),
             'last_checked_at' => $collectedAt,
         ]);
 
@@ -146,22 +151,31 @@ class ShoppingPriceRecorder
                 'query' => $query,
                 'google_product_id' => $offer->googleProductId,
                 'google_link' => $offer->googleLink,
+                'store_link' => $offer->storeSearchLink(),
             ],
-        ]);
+        ])->setRelation('source', $source->setRelation('store', $store));
     }
 
     /**
-     * Loja conhecida pelo domínio; loja nova do Google Shopping é identificada pelo nome.
+     * Loja conhecida pelo domínio (grande varejo, confiável); loja nova do Google Shopping é identificada pelo nome.
      */
     protected function resolveStore(string $storeName): Store
     {
         $domain = $this->serper->domainForStore($storeName);
 
         if ($domain !== null) {
-            return Store::firstOrCreate(
+            $trustLevel = in_array($domain, self::ThirdPartyMarketplaces, true) ? 'marketplace_3p' : 'marketplace_1p';
+            $store = Store::firstOrCreate(
                 ['domain' => $domain],
-                ['name' => $storeName, 'active' => true, 'trust_level' => 'standard'],
+                ['name' => $storeName, 'active' => true, 'trust_level' => $trustLevel],
             );
+
+            // Loja conhecida criada antes como "não verificada" (descoberta automática) é promovida
+            if ($store->trust_level === 'standard') {
+                $store->update(['trust_level' => $trustLevel]);
+            }
+
+            return $store;
         }
 
         return Store::firstOrCreate(

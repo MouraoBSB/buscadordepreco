@@ -87,6 +87,59 @@ class MonitoredProductsWidgetTest extends TestCase
         $this->assertEquals(3163.13, $items[0]['current_price']);
     }
 
+    public function test_widget_prefers_trusted_store_and_flags_cheaper_unverified_offer(): void
+    {
+        $product = Product::create(['name' => 'Galaxy S25', 'image_url' => 'https://exemplo.test/s25.png', 'active' => true]);
+        $kabum = Store::create(['name' => 'KaBuM!', 'domain' => 'kabum.com.br', 'trust_level' => 'marketplace_1p']);
+        $outlet = Store::create(['name' => 'Outlet do Celular', 'domain' => '', 'trust_level' => 'standard']);
+
+        foreach ([[$kabum, 3163.13, 'kabum'], [$outlet, 2763.90, 'outlet']] as [$store, $price, $slug]) {
+            $source = ProductSource::create([
+                'product_id' => $product->id,
+                'store_id' => $store->id,
+                'url' => "https://www.google.com/search?q={$slug}",
+                'collector_type' => ProductSource::CollectorGoogleShopping,
+                'active' => true,
+            ]);
+            PriceObservation::create([
+                'product_source_id' => $source->id,
+                'regular_price' => $price,
+                'in_stock' => true,
+                'collected_at' => now(),
+                'metadata' => ['google_link' => "https://www.google.com/search?ibp=oshop&prds={$slug}"],
+            ]);
+        }
+
+        [$item] = (new MonitoredProductsWidget)->getProducts();
+
+        $this->assertEquals(3163.13, $item['current_price']);
+        $this->assertSame('https://www.google.com/search?q=kabum', $item['offer_url']);
+        $this->assertSame('https://www.google.com/search?ibp=oshop&prds=kabum', $item['compare_url']);
+        $this->assertSame(['price' => 2763.90, 'store' => 'Outlet do Celular', 'url' => 'https://www.google.com/search?q=outlet'], $item['unverified_offer']);
+    }
+
+    public function test_widget_current_price_ignores_offers_older_than_24_hours(): void
+    {
+        $product = Product::create(['name' => 'Galaxy S25', 'image_url' => 'https://exemplo.test/s25.png', 'active' => true]);
+        $store = Store::create(['name' => 'KaBuM!', 'domain' => 'kabum.com.br']);
+        $source = ProductSource::create([
+            'product_id' => $product->id,
+            'store_id' => $store->id,
+            'url' => 'https://www.google.com/search?q=kabum',
+            'collector_type' => ProductSource::CollectorGoogleShopping,
+            'active' => true,
+        ]);
+
+        PriceObservation::create(['product_source_id' => $source->id, 'regular_price' => 2900, 'in_stock' => true, 'collected_at' => now()->subDays(3)]);
+        PriceObservation::create(['product_source_id' => $source->id, 'regular_price' => 3163.13, 'in_stock' => true, 'collected_at' => now()]);
+
+        [$item] = (new MonitoredProductsWidget)->getProducts();
+
+        $this->assertEquals(3163.13, $item['current_price']);
+        $this->assertSame('in_stock', $item['price_type']);
+        $this->assertSame('Menor histórico: R$ 2.900,00', $item['price_subtext']);
+    }
+
     public function test_widget_displays_lowest_historical_price_when_out_of_stock(): void
     {
         $product = Product::create([

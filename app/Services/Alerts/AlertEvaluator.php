@@ -161,6 +161,11 @@ class AlertEvaluator
         $voltageText = $product->voltage ? " | Tensão: *{$product->voltage}*" : '';
         $modelText = $product->model_code ? "📌 Modelo: `{$product->model_code}`{$voltageText}\n\n" : '';
 
+        $compareUrl = $observation->metadata['google_link'] ?? null;
+        $isTrustedStore = (bool) $source->store?->isTrusted();
+        $compareText = $compareUrl ? "🔎 Comparar lojas no Google:\n{$compareUrl}\n\n" : '';
+        $trustWarning = $isTrustedStore ? '' : "⚠️ Loja pouco conhecida: confira antes de comprar.\n\n";
+
         $message = "🚨 *ALERTA PRICEWATCH*\n\n"
             ."*{$prodName}*\n"
             .$modelText
@@ -170,6 +175,8 @@ class AlertEvaluator
             .'💰 *Melhor Preço Final: R$ '.number_format($price, 2, ',', '.')."*\n"
             ."🏪 Loja: *{$storeName}* (Vendido por: {$seller})\n"
             ."🔗 Link da Oferta:\n{$source->url}\n\n"
+            .$compareText
+            .$trustWarning
             .'⏰ Coletado em: '.Carbon::parse($observation->collected_at)->format('d/m/Y H:i');
 
         $alertRecord = Alert::create([
@@ -182,6 +189,8 @@ class AlertEvaluator
                 'message' => $message,
                 'reason' => $reason,
                 'url' => $source->url,
+                'compare_url' => $compareUrl,
+                'trusted_store' => $isTrustedStore,
                 'regular_price' => $observation->regular_price,
                 'pix_price' => $observation->pix_price,
                 'coupon_price' => $observation->coupon_price,
