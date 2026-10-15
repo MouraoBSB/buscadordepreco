@@ -163,5 +163,11 @@ grátis (cerca de US$ 1 por 1.000, créditos expiram em 6 meses).
   - Passo 4: gravar as ofertas aceitas no histórico (`price_observations` ou estrutura
     nova; conferir o schema antes) e alertar abaixo da meta ou da média, rodando pelo
     scheduler.
-  - Verificar num navegador se o link montado pelo `productId` abre a oferta certa.
   - Definir o critério numérico de "seguir ou encerrar", que pode já estar respondido.
+- Links testados pelo usuário no navegador:
+  - O link original do Serper (`ibp=oshop&prds=...gpcid...`) abre o painel do produto com
+    as lojas e a faixa "o preço normalmente é de R$ X–Y".
+  - O link montado só com `catalogid` **falha** ("detalhes do produto não estão
+    disponíveis"): o Google exige o `gpcid`.
+  - A busca `q=<título> <loja>&udm=28` traz a oferta como primeiro resultado. Ela passou a
+    ser o fallback quando o Serper não devolve link.

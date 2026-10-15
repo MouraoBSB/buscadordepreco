@@ -80,7 +80,7 @@ class SerperShoppingClient
                 price: ShoppingOffer::parseBrazilianPrice($result['price'] ?? null),
                 googleProductId: $result['productId'] ?? null,
                 imageUrl: $result['imageUrl'] ?? null,
-                googleLink: $result['link'] ?? $this->googleLinkFromProductId($result['productId'] ?? null, $title),
+                googleLink: $result['link'] ?? $this->googleShoppingSearchLink($title, $storeName),
             );
         }
 
@@ -88,20 +88,16 @@ class SerperShoppingClient
     }
 
     /**
-     * Monta o link do painel do Google Shopping quando o Serper não devolve "link" (o productId é o catalogid).
+     * Busca na aba Shopping pelo título exato e pela loja, usada quando o Serper não devolve "link".
+     * Montar o painel pelo productId não funciona: o Google exige o gpcid, que não vem na resposta.
      */
-    protected function googleLinkFromProductId(?string $productId, string $title): ?string
+    protected function googleShoppingSearchLink(string $title, string $storeName): string
     {
-        if ($productId === null || $productId === '') {
-            return null;
-        }
-
         return 'https://www.google.com/search?'.http_build_query([
-            'ibp' => 'oshop',
-            'q' => $title,
-            'prds' => "catalogid:{$productId},pvt:hg",
-            'gl' => 'br',
+            'q' => "{$title} {$storeName}",
             'udm' => 28,
+            'gl' => 'br',
+            'hl' => 'pt-BR',
         ]);
     }
 

@@ -79,7 +79,7 @@ class ProbeOffersCommandTest extends TestCase
         $this->assertSame(ShoppingOfferMatcher::Accepted, $result['status'], (string) $result['reason']);
     }
 
-    public function test_builds_google_link_from_product_id_when_serper_omits_it(): void
+    public function test_falls_back_to_shopping_search_link_when_serper_omits_it(): void
     {
         Http::fake([
             'google.serper.dev/shopping' => Http::response([
@@ -92,8 +92,10 @@ class ProbeOffersCommandTest extends TestCase
 
         [$offer] = app(SerperShoppingClient::class)->searchOffers('galaxy s25');
 
-        $this->assertStringStartsWith('https://www.google.com/search?ibp=oshop&', $offer->googleLink);
-        $this->assertStringContainsString('prds=catalogid%3A11165022278430168481', $offer->googleLink);
+        $this->assertSame(
+            'https://www.google.com/search?q=Samsung+Galaxy+S25+5G+256GB+Horizon+Play&udm=28&gl=br&hl=pt-BR',
+            $offer->googleLink,
+        );
     }
 
     public function test_probe_shows_cheapest_matching_offer_with_google_link_using_a_single_search(): void
