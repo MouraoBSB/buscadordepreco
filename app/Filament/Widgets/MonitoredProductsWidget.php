@@ -170,12 +170,12 @@ class MonitoredProductsWidget extends Widget
 
             $offerUrl = null;
             $offerStore = null;
-            if ($lowestInStockObs && $lowestInStockObs->source?->url) {
-                $offerUrl = $lowestInStockObs->source->url;
-                $offerStore = $lowestInStockObs->source->store?->name;
-            } elseif ($winningObs && $winningObs->source?->url) {
-                $offerUrl = $winningObs->source->url;
-                $offerStore = $winningObs->source->store?->name;
+            $offerIsDirect = true;
+            $offerObs = $lowestInStockObs ?? ($winningObs?->source ? $winningObs : null);
+            if ($offerObs) {
+                $offerUrl = $this->offerLink($offerObs);
+                $offerStore = $offerObs->source?->store?->name;
+                $offerIsDirect = $this->isDirectLink($offerObs);
             } elseif ($lowestCandidate && $lowestCandidate->url) {
                 $offerUrl = $lowestCandidate->url;
                 $offerStore = $lowestCandidate->discovered_store_name;
@@ -196,12 +196,14 @@ class MonitoredProductsWidget extends Widget
                 'target_price' => $prod->target_price ? (float) $prod->target_price : null,
                 'current_price' => $price,
                 'offer_url' => $offerUrl,
+                'offer_is_direct' => $offerIsDirect,
                 'offer_store' => $offerStore,
                 'compare_url' => ($lowestInStockObs ?? $winningObs)?->metadata['google_link'] ?? null,
                 'unverified_offer' => $unverifiedObs ? [
                     'price' => (float) $unverifiedObs->effective_price,
                     'store' => $unverifiedObs->source?->store?->name ?? $unverifiedObs->seller,
-                    'url' => $unverifiedObs->source?->url,
+                    'url' => $this->offerLink($unverifiedObs),
+                    'is_direct' => $this->isDirectLink($unverifiedObs),
                 ] : null,
                 'price_type' => $priceType,
                 'price_label' => $priceLabel,
@@ -220,6 +222,21 @@ class MonitoredProductsWidget extends Widget
         }
 
         return $items;
+    }
+
+    /**
+     * Link da oferta: página real na loja quando encontrada; senão a busca da oferta no Google Shopping.
+     */
+    protected function offerLink(PriceObservation $observation): ?string
+    {
+        return $observation->metadata['direct_url']
+            ?? $observation->metadata['store_link']
+            ?? $observation->source?->url;
+    }
+
+    protected function isDirectLink(PriceObservation $observation): bool
+    {
+        return ! $observation->source?->isGoogleShopping() || filled($observation->metadata['direct_url'] ?? null);
     }
 
     public function discoverProduct(int $productId): void

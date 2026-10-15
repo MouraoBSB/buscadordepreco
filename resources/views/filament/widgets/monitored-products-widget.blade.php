@@ -148,7 +148,7 @@
                     </div>
 
                     @if ($product['unverified_offer'])
-                        <a href="{{ $product['unverified_offer']['url'] }}" target="_blank" rel="noopener noreferrer" style="margin-top: 0.75rem; display: flex; align-items: flex-start; gap: 0.375rem; padding: 0.5rem 0.625rem; border-radius: 0.5rem; background-color: #fffbeb; border: 1px solid #fde68a; color: #92400e; font-size: 0.6875rem; line-height: 1.3; text-decoration: none;" title="Abrir oferta em {{ $product['unverified_offer']['store'] }}">
+                        <a href="{{ $product['unverified_offer']['url'] }}" target="_blank" rel="noopener noreferrer" style="margin-top: 0.75rem; display: flex; align-items: flex-start; gap: 0.375rem; padding: 0.5rem 0.625rem; border-radius: 0.5rem; background-color: #fffbeb; border: 1px solid #fde68a; color: #92400e; font-size: 0.6875rem; line-height: 1.3; text-decoration: none;" title="{{ $product['unverified_offer']['is_direct'] ? 'Abrir a página do produto em ' . $product['unverified_offer']['store'] : 'Abrir a oferta no Google Shopping' }}">
                             <span aria-hidden="true">⚠️</span>
                             <span>
                                 <strong>R$ {{ number_format($product['unverified_offer']['price'], 2, ',', '.') }}</strong>
@@ -172,8 +172,8 @@
                             </x-filament::button>
 
                             @if ($product['offer_url'])
-                                <a href="{{ $product['offer_url'] }}" target="_blank" rel="noopener noreferrer" style="font-weight: 600; color: #2563eb; display: inline-flex; align-items: center; gap: 0.25rem; text-decoration: none; padding: 0.25rem 0.625rem; border-radius: 0.375rem; background-color: #eff6ff; border: 1px solid #dbeafe;" class="hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/60 dark:text-blue-400 dark:border-blue-900" title="{{ $product['offer_store'] ? 'Abrir oferta em ' . $product['offer_store'] : 'Abrir oferta na loja' }}">
-                                    <span>Ver Oferta</span>
+                                <a href="{{ $product['offer_url'] }}" target="_blank" rel="noopener noreferrer" style="font-weight: 600; color: #2563eb; display: inline-flex; align-items: center; gap: 0.25rem; text-decoration: none; padding: 0.25rem 0.625rem; border-radius: 0.375rem; background-color: #eff6ff; border: 1px solid #dbeafe;" class="hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/60 dark:text-blue-400 dark:border-blue-900" title="{{ $product['offer_is_direct'] ? 'Abrir a página do produto em ' . ($product['offer_store'] ?? 'loja') : 'Página da loja não encontrada: abre a oferta no Google Shopping' }}">
+                                    <span>{{ $product['offer_is_direct'] ? 'Ver na loja' : 'Ver no Google' }}</span>
                                     <x-filament::icon icon="heroicon-m-arrow-top-right-on-square" class="h-3.5 w-3.5" />
                                 </a>
                                 @if ($product['compare_url'])

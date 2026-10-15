@@ -26,6 +26,13 @@ class ShoppingPricesCommandTest extends TestCase
 
     protected Product $product;
 
+    /**
+     * Resultados orgânicos devolvidos pela busca do endereço na loja (Serper /search).
+     *
+     * @var array<int, array{link: string, title: string}>
+     */
+    protected array $organicResults = [];
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -58,6 +65,7 @@ class ShoppingPricesCommandTest extends TestCase
                 ],
                 'credits' => 2,
             ]),
+            'google.serper.dev/search' => fn () => Http::response(['organic' => $this->organicResults, 'credits' => 1]),
         ]);
     }
 
@@ -65,8 +73,9 @@ class ShoppingPricesCommandTest extends TestCase
     {
         Store::create(['name' => 'Magazine Luiza', 'domain' => 'magazineluiza.com.br', 'active' => true]);
 
+        // 2 créditos da busca + 1 por endereço procurado (melhor oferta confiável e a mais barata)
         $this->artisan('pricewatch:shopping')
-            ->expectsOutputToContain('Créditos Serper usados: 2')
+            ->expectsOutputToContain('Créditos Serper usados: 4')
             ->assertSuccessful();
 
         $sources = ProductSource::with('store')->where('product_id', $this->product->id)->get();
@@ -95,6 +104,41 @@ class ShoppingPricesCommandTest extends TestCase
         $this->assertStringContainsString('GOWA_ENABLED', $alert->error_message);
 
         $this->assertSame(2, (int) ApiUsageLog::where('provider', 'serper')->where('purpose', 'shopping')->sum('credits_used'));
+    }
+
+    public function test_resolves_store_page_for_best_offer_and_reuses_it_on_next_run(): void
+    {
+        $this->organicResults = [
+            ['link' => 'https://www.kabum.com.br/busca/galaxy-s25', 'title' => 'Busca Galaxy S25'],
+            ['link' => 'https://www.kabum.com.br/produto/703060/samsung-galaxy-s25-5g-256gb?srsltid=abc', 'title' => 'Samsung Galaxy S25 5G 256GB Galaxy AI Prata'],
+        ];
+
+        $this->artisan('pricewatch:shopping')->assertSuccessful();
+        $this->artisan('pricewatch:shopping')->assertSuccessful();
+
+        $directUrl = 'https://www.kabum.com.br/produto/703060/samsung-galaxy-s25-5g-256gb';
+        $kabum = ProductSource::whereHas('store', fn ($query) => $query->where('domain', 'kabum.com.br'))->sole();
+        $this->assertSame($directUrl, $kabum->url);
+        $this->assertSame($directUrl, Alert::sole()->payload['url']);
+
+        // Outlet do Celular não tem domínio conhecido e o resultado é de outra loja: fica sem endereço direto
+        $outlet = ProductSource::whereHas('store', fn ($query) => $query->where('name', 'Outlet do Celular'))->sole();
+        $this->assertStringStartsWith('https://www.google.com/search?', $outlet->url);
+
+        // 1ª rodada: KaBuM e Outlet; 2ª rodada reaproveita os dois resultados
+        $this->assertSame(2, Http::recorded(fn ($request): bool => str_contains($request->url(), '/search'))->count());
+    }
+
+    public function test_store_page_with_title_of_another_product_is_discarded(): void
+    {
+        $this->organicResults = [
+            ['link' => 'https://www.kabum.com.br/produto/1/capinha-galaxy-s25', 'title' => 'Capinha Samsung Galaxy S25 256GB Transparente'],
+        ];
+
+        $this->artisan('pricewatch:shopping')->assertSuccessful();
+
+        $kabum = ProductSource::whereHas('store', fn ($query) => $query->where('domain', 'kabum.com.br'))->sole();
+        $this->assertStringStartsWith('https://www.google.com/search?', $kabum->url);
     }
 
     public function test_second_run_reuses_sources_and_does_not_repeat_the_alert(): void

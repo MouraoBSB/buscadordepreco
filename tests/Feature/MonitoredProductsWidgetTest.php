@@ -115,7 +115,17 @@ class MonitoredProductsWidgetTest extends TestCase
         $this->assertEquals(3163.13, $item['current_price']);
         $this->assertSame('https://www.google.com/search?q=kabum', $item['offer_url']);
         $this->assertSame('https://www.google.com/search?ibp=oshop&prds=kabum', $item['compare_url']);
-        $this->assertSame(['price' => 2763.90, 'store' => 'Outlet do Celular', 'url' => 'https://www.google.com/search?q=outlet'], $item['unverified_offer']);
+        $this->assertSame(['price' => 2763.90, 'store' => 'Outlet do Celular', 'url' => 'https://www.google.com/search?q=outlet', 'is_direct' => false], $item['unverified_offer']);
+        $this->assertFalse($item['offer_is_direct']);
+
+        // Com o endereço real encontrado, o card aponta para a loja
+        PriceObservation::whereHas('source.store', fn ($query) => $query->where('name', 'KaBuM!'))
+            ->update(['metadata' => ['google_link' => 'https://www.google.com/search?ibp=oshop&prds=kabum', 'direct_url' => 'https://www.kabum.com.br/produto/703060']]);
+
+        [$item] = (new MonitoredProductsWidget)->getProducts();
+
+        $this->assertSame('https://www.kabum.com.br/produto/703060', $item['offer_url']);
+        $this->assertTrue($item['offer_is_direct']);
 
         // Com o mesmo preço da loja confiável não há o que avisar
         PriceObservation::whereHas('source.store', fn ($query) => $query->where('name', 'Outlet do Celular'))->update(['regular_price' => 3163.13]);

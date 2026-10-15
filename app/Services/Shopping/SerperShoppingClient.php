@@ -9,6 +9,7 @@ namespace App\Services\Shopping;
 
 use App\Models\ApiUsageLog;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 use RuntimeException;
 
 /**
@@ -107,7 +108,24 @@ class SerperShoppingClient
      */
     public function findStoreUrl(ShoppingOffer $offer): ?string
     {
+        return $this->findStorePage($offer)['url'] ?? null;
+    }
+
+    /**
+     * Busca a página do produto no site da loja (1 crédito). Loja sem domínio conhecido só é aceita
+     * quando o endereço do resultado contém o nome da loja, para não cair em outra loja.
+     *
+     * @return array{url: string, title: string}|null
+     */
+    public function findStorePage(ShoppingOffer $offer): ?array
+    {
         $domain = $this->domainForStore($offer->storeName);
+        $storeSlug = preg_replace('/[^a-z0-9]/', '', Str::ascii(mb_strtolower($offer->storeName, 'UTF-8')));
+
+        if ($domain === null && strlen($storeSlug) < 4) {
+            return null;
+        }
+
         $query = $domain !== null
             ? "{$offer->title} site:{$domain}"
             : "{$offer->title} {$offer->storeName}";
@@ -116,21 +134,24 @@ class SerperShoppingClient
 
         foreach ($organicResults as $result) {
             $link = $result['link'] ?? '';
-            $host = (string) parse_url($link, PHP_URL_HOST);
+            $host = strtolower((string) parse_url($link, PHP_URL_HOST));
 
             if ($link === '' || str_contains($host, 'google.')) {
                 continue;
             }
 
-            if ($domain !== null && ! str_contains($host, $domain)) {
+            $isStoreHost = $domain !== null
+                ? str_contains($host, $domain)
+                : str_contains(preg_replace('/[^a-z0-9]/', '', $host), $storeSlug);
+
+            if (! $isStoreHost || $this->isListingPage($link)) {
                 continue;
             }
 
-            if ($this->isListingPage($link)) {
-                continue;
-            }
-
-            return $this->stripTrackingParameters($link);
+            return [
+                'url' => $this->stripTrackingParameters($link),
+                'title' => (string) ($result['title'] ?? ''),
+            ];
         }
 
         return null;
