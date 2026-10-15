@@ -100,6 +100,22 @@ grátis (cerca de US$ 1 por 1.000, créditos expiram em 6 meses).
 
 ## Registro
 
+### 2026-10-14 (divergência de preço e produtos usados)
+- O card do S25 mostrava R$ 2.763,90 (Outlet do Celular), mas o link levava a outro
+  preço. Causas:
+  - O link do Serper abre o painel do **produto** no Google (várias lojas, em destaque
+    as que o Google prefere), não a oferta daquela loja.
+  - A oferta está 30% abaixo da faixa "normal" que o próprio Google exibe; o título não
+    diz que é usado.
+  - O "menor preço" do card é o mínimo de todo o histórico, não o da última rodada.
+- Teste de filtro de condição no Serper (8 créditos), busca "Galaxy S25":
+  - `tbs=mr:1,new:1` é **ignorado**: o resultado sai idêntico.
+  - `-usado -seminovo` **piora** (14 usados contra 7): o Google ignora o operador.
+  - Acrescentar "novo" à busca: 12 ofertas e 0 usados, mas **perde a melhor oferta nova
+    real** (KaBuM a R$ 3.163,13). Descartado.
+  - Conclusão: não há como excluir usados na origem. O caminho é o filtro por título e
+    loja somado a uma lista de lojas confiáveis.
+
 ### 2026-10-14 (correções do painel e Tavily só para fotos)
 - O usuário viu preços ilógicos no card: Galaxy S25 a R$ 69,90 (capinha) e Switch 2 a
   R$ 129 (jogo).
