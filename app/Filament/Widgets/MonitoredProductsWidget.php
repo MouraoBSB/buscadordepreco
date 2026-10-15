@@ -36,7 +36,9 @@ class MonitoredProductsWidget extends Widget
                 ->where('in_stock', true)
                 ->where('collected_at', '>=', now()->subHours(self::CurrentPriceWindowHours))
                 ->whereRaw('COALESCE(pix_price, regular_price) > 0')
-                ->orderByRaw('COALESCE(pix_price, regular_price) ASC');
+                ->orderByRaw('COALESCE(pix_price, regular_price) ASC')
+                ->orderByDesc('collected_at')
+                ->orderByDesc('id');
 
             $lowestTrustedObs = $currentQuery()->whereHas('source.store', fn ($q) => $q->trusted())->first();
             $lowestAnyObs = $currentQuery()->first();
@@ -236,7 +238,9 @@ class MonitoredProductsWidget extends Widget
 
     protected function isDirectLink(PriceObservation $observation): bool
     {
-        return ! $observation->source?->isGoogleShopping() || filled($observation->metadata['direct_url'] ?? null);
+        $host = strtolower((string) parse_url((string) $this->offerLink($observation), PHP_URL_HOST));
+
+        return $host !== '' && ! str_contains($host, 'google.');
     }
 
     public function discoverProduct(int $productId): void
