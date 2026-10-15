@@ -12,11 +12,14 @@ use App\Services\Shopping\OfferPageVerifier;
 use App\Services\Shopping\SerperShoppingClient;
 use App\Services\Shopping\ShoppingOffer;
 use App\Services\Shopping\ShoppingOfferMatcher;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class ProbeOffersCommandTest extends TestCase
 {
+    use RefreshDatabase;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -46,6 +49,8 @@ class ProbeOffersCommandTest extends TestCase
             'armazenamento' => new ShoppingOffer('Samsung Galaxy S25 512GB', 'Casas Bahia', 4299.00),
             'como_novo' => new ShoppingOffer('Galaxy S25 256GB Azul Marinho - Sou Como Novo', 'Trocafy', 3133.71),
             'kit' => new ShoppingOffer('Smartphone Samsung Galaxy S25 256GB - 5G + Smartwatch Galaxy Watch8', 'Magalu', 5228.99),
+            'capinha' => new ShoppingOffer('Capinha Personalizada Samsung Galaxy S25 256GB Gocase', 'Gocase', 69.90),
+            'pelicula' => new ShoppingOffer('Película de Vidro Galaxy S25 256GB', 'Shopee', 19.90),
             'barato' => new ShoppingOffer('Samsung Galaxy S25 256GB Azul', 'Loja Desconhecida', 1500.00),
             'sem_preco' => new ShoppingOffer('Samsung Galaxy S25 256GB', 'Fast Shop', null),
         ];
@@ -56,7 +61,7 @@ class ProbeOffersCommandTest extends TestCase
         $this->assertSame(ShoppingOfferMatcher::Accepted, $results['ram']['status']);
         $this->assertSame(ShoppingOfferMatcher::Suspicious, $results['barato']['status']);
 
-        foreach (['ultra', 'mais', 'usado', 'armazenamento', 'sem_preco', 'como_novo', 'kit'] as $key) {
+        foreach (['ultra', 'mais', 'usado', 'armazenamento', 'sem_preco', 'como_novo', 'kit', 'capinha', 'pelicula'] as $key) {
             $this->assertSame(ShoppingOfferMatcher::Rejected, $results[$key]['status'], "Oferta '{$key}' deveria ser recusada.");
         }
 
@@ -77,6 +82,24 @@ class ProbeOffersCommandTest extends TestCase
         ]);
 
         $this->assertSame(ShoppingOfferMatcher::Accepted, $result['status'], (string) $result['reason']);
+    }
+
+    public function test_console_rejects_games_and_controllers_but_keeps_the_console(): void
+    {
+        $product = new Product(['name' => 'Nintendo Switch 2', 'brand' => 'Nintendo']);
+
+        $results = app(ShoppingOfferMatcher::class)->match($product, [
+            new ShoppingOffer('System Shock 2: 25th Anniversary Remaster - Nintendo Switch 2 Edition', 'nintendo.com', 129.00),
+            new ShoppingOffer('Controle Joy-Con 2 Nintendo Switch 2 Azul e Vermelho', 'Nova Era Games', 399.90),
+            new ShoppingOffer('Nintendo Switch 2 Donkey Kong Banana Kingdom Cartão de Jogo Físico', 'mimilon.com.br', 927.66),
+            new ShoppingOffer('Console Nintendo Switch 2 256GB Nacional', 'Fast Shop', 4049.91),
+            new ShoppingOffer('Nintendo Switch 2, Com Joy-Con 2, BBESKB6AA', 'Miranda', 3989.05),
+        ]);
+
+        $this->assertSame(
+            [ShoppingOfferMatcher::Rejected, ShoppingOfferMatcher::Rejected, ShoppingOfferMatcher::Rejected, ShoppingOfferMatcher::Accepted, ShoppingOfferMatcher::Accepted],
+            array_column($results, 'status'),
+        );
     }
 
     public function test_washer_rejects_washer_dryer_and_two_offers_are_not_judged_as_outliers(): void

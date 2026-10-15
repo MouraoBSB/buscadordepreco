@@ -56,6 +56,37 @@ class MonitoredProductsWidgetTest extends TestCase
         $this->assertTrue($items[0]['is_below_target']);
     }
 
+    public function test_widget_ignores_suspicious_prices(): void
+    {
+        $product = Product::create(['name' => 'Galaxy S25', 'image_url' => 'https://exemplo.test/s25.png', 'active' => true]);
+        $store = Store::create(['name' => 'Gocase', 'domain' => '']);
+        $source = ProductSource::create([
+            'product_id' => $product->id,
+            'store_id' => $store->id,
+            'url' => 'https://www.google.com/search?ibp=oshop',
+            'collector_type' => ProductSource::CollectorGoogleShopping,
+            'active' => true,
+        ]);
+
+        PriceObservation::create([
+            'product_source_id' => $source->id,
+            'regular_price' => 69.90,
+            'in_stock' => true,
+            'is_suspicious' => true,
+            'collected_at' => now(),
+        ]);
+        PriceObservation::create([
+            'product_source_id' => $source->id,
+            'regular_price' => 3163.13,
+            'in_stock' => true,
+            'collected_at' => now(),
+        ]);
+
+        $items = (new MonitoredProductsWidget)->getProducts();
+
+        $this->assertEquals(3163.13, $items[0]['current_price']);
+    }
+
     public function test_widget_displays_lowest_historical_price_when_out_of_stock(): void
     {
         $product = Product::create([

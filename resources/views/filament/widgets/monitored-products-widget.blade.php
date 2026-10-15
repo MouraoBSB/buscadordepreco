@@ -34,9 +34,11 @@
 
                             <div style="flex: 1; min-width: 0;">
                                 <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.25rem;">
-                                    <span style="display: inline-flex; align-items: center; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 600; background-color: #f3f4f6; color: #1f2937;">
-                                        {{ $product['brand'] }}
-                                    </span>
+                                    @if (filled($product['brand']))
+                                        <span style="display: inline-flex; align-items: center; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 600; background-color: #f3f4f6; color: #1f2937;">
+                                            {{ $product['brand'] }}
+                                        </span>
+                                    @endif
                                     @if ($product['voltage'])
                                         <span style="display: inline-flex; align-items: center; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 600; background-color: #fef3c7; color: #92400e; border: 1px solid rgba(251, 191, 36, 0.4);">
                                             {{ $product['voltage'] }}
@@ -48,9 +50,11 @@
                                         <h4 style="font-size: 0.875rem; font-weight: 700; color: #111827; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ $product['name'] }}" class="dark:text-gray-100">
                                             {{ $product['commercial_name'] }}
                                         </h4>
-                                        <p style="font-size: 0.75rem; color: #6b7280; font-family: monospace; margin-top: 0.125rem;">
-                                            {{ $product['model_code'] ?? 'Universal' }}
-                                        </p>
+                                        @if (filled($product['model_code']))
+                                            <p style="font-size: 0.75rem; color: #6b7280; font-family: monospace; margin-top: 0.125rem;">
+                                                {{ $product['model_code'] }}
+                                            </p>
+                                        @endif
                                     </div>
                                     <a href="{{ \App\Filament\Resources\Products\ProductResource::getUrl('edit', ['record' => $product['id']]) }}" title="Editar configurações do produto" style="color: #94a3b8; display: inline-flex; align-items: center; justify-content: center; padding: 0.125rem; border-radius: 0.25rem;" class="hover:text-primary-600 dark:hover:text-primary-400">
                                         <x-filament::icon icon="heroicon-m-pencil-square" class="h-4 w-4" />

@@ -9,6 +9,7 @@ namespace Tests\Feature;
 
 use App\Models\Alert;
 use App\Models\AlertRule;
+use App\Models\ApiUsageLog;
 use App\Models\PriceObservation;
 use App\Models\Product;
 use App\Models\ProductSource;
@@ -84,6 +85,8 @@ class ShoppingPricesCommandTest extends TestCase
         $this->assertEquals(3899.00, $alert->payload['price']);
         $this->assertSame('https://www.google.com/search?ibp=oshop&prds=kabum', $alert->payload['url']);
         $this->assertStringContainsString('GOWA_ENABLED', $alert->error_message);
+
+        $this->assertSame(2, (int) ApiUsageLog::where('provider', 'serper')->where('purpose', 'shopping')->sum('credits_used'));
     }
 
     public function test_second_run_reuses_sources_and_does_not_repeat_the_alert(): void

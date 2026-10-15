@@ -155,8 +155,9 @@ class ProductForm
                                 '127V' => '127V',
                                 'Bivolt' => 'Bivolt',
                             ])
-                            ->nullable()
-                            ->default('Bivolt'),
+                            ->placeholder('Não se aplica')
+                            ->helperText('Só para produtos ligados na tomada (ex.: eletrodomésticos).')
+                            ->nullable(),
 
                         TextInput::make('target_price')
                             ->label('Preço Alvo (R$)')

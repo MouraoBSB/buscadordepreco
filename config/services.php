@@ -51,6 +51,8 @@ return [
 
     'serper' => [
         'key' => env('SERPER_API_KEY'),
+        // Orçamento mensal de créditos exibido no painel (4 rodadas/dia ≈ 240 créditos por produto)
+        'monthly_limit' => (int) env('SERPER_MONTHLY_LIMIT', 2000),
     ],
 
 ];

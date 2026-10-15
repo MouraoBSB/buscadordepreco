@@ -7,6 +7,7 @@
 
 namespace App\Services\Shopping;
 
+use App\Models\ApiUsageLog;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
@@ -170,16 +171,29 @@ class SerperShoppingClient
             throw new RuntimeException('SERPER_API_KEY não configurada no .env.');
         }
 
+        $startedAt = microtime(true);
+
         $response = Http::withHeaders(['X-API-KEY' => config('services.serper.key')])
             ->acceptJson()
             ->timeout(20)
             ->post(self::BASE_URL.$endpoint, array_merge(['gl' => 'br', 'hl' => 'pt-br'], $payload));
 
+        $credits = $response->failed() ? 0 : (int) $response->json('credits', 1);
+
+        ApiUsageLog::logRequest(
+            provider: 'serper',
+            purpose: $endpoint === '/shopping' ? 'shopping' : 'store_url',
+            query: mb_substr((string) ($payload['q'] ?? ''), 0, 500),
+            credits: $credits,
+            status: $response->status(),
+            durationMs: (int) round((microtime(true) - $startedAt) * 1000),
+        );
+
         if ($response->failed()) {
             throw new RuntimeException("Serper {$endpoint} falhou com HTTP {$response->status()}.");
         }
 
-        $this->creditsUsed += (int) $response->json('credits', 1);
+        $this->creditsUsed += $credits;
 
         return $response->json() ?? [];
     }

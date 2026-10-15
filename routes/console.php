@@ -8,21 +8,10 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-// Schedule daily collection for all active product sources without overlapping
-Schedule::command('pricewatch:collect')
-    ->dailyAt('08:00')
-    ->withoutOverlapping()
-    ->runInBackground();
-
-// Preços do Google Shopping 4x ao dia (2 créditos Serper por produto a cada rodada)
+// Preços do Google Shopping 4x ao dia (2 créditos Serper por produto a cada rodada).
+// pricewatch:discover (Tavily) e pricewatch:collect (raspagem das lojas) saíram do agendamento
+// em 2026-10-14: davam preços fantasmas e 403; seguem disponíveis para uso manual.
 Schedule::command('pricewatch:shopping')
     ->cron('0 8,12,16,20 * * *')
-    ->withoutOverlapping()
-    ->runInBackground();
-
-// Schedule discovery twice a week (Tuesday & Friday at 09:00) to find new deals and stores
-Schedule::command('pricewatch:discover')
-    ->days([2, 5])
-    ->at('09:00')
     ->withoutOverlapping()
     ->runInBackground();

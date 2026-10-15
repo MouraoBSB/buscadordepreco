@@ -41,6 +41,12 @@ class CandidateValidator
             return CandidateValidationResult::reject("Anúncio de produto usado/recondicionado ('{$usedMatch[1]}').");
         }
 
+        // 0.25 Acessório, jogo ou peça avulsa do produto (ex.: "Capinha Galaxy S25", "Jogo ... Switch 2 Edition")
+        $accessoryPattern = '/\b(capa|capinha|case|pel[íi]cula|vidro\s+temperado|carregador|cabo|suporte|adesivo|skin|estojo|bolsa|jogo|edition|controle|cart[ãa]o\s+de\s+jogo|c[óo]digo\s+digital|\d+\s+d[íi]gitos|m[íi]dia\s+digital)\b/iu';
+        if (preg_match($accessoryPattern, $title, $accessoryMatch) && ! preg_match($accessoryPattern, $productName)) {
+            return CandidateValidationResult::reject("Anúncio de acessório/jogo, não do produto ('{$accessoryMatch[1]}').");
+        }
+
         // 0.3 Kit ou combo com outro produto (ex.: "S25 + Smartwatch") distorce o preço
         $bundlePattern = '/(\s\+\s*\p{L})|\b(kit|combo)\b/iu';
         if (preg_match($bundlePattern, $title) && ! preg_match($bundlePattern, $productName)) {

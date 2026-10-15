@@ -4,11 +4,11 @@ namespace App\Filament\Widgets;
 
 use App\Models\PriceObservation;
 use App\Models\Product;
-use App\Services\Collector\Pipeline\CollectionPipeline;
 use App\Services\Coupons\CouponCalculatorService;
-use App\Services\Discovery\ProductDiscoveryService;
+use App\Services\Shopping\ShoppingPriceRecorder;
 use Filament\Notifications\Notification;
 use Filament\Widgets\Widget;
+use Illuminate\Support\Facades\Log;
 
 class MonitoredProductsWidget extends Widget
 {
@@ -28,6 +28,7 @@ class MonitoredProductsWidget extends Widget
             $lowestInStockObs = PriceObservation::query()
                 ->whereHas('source', fn ($q) => $q->where('product_id', $prod->id)->where('active', true))
                 ->where('is_mismatch', false)
+                ->where('is_suspicious', false)
                 ->where('in_stock', true)
                 ->whereRaw('COALESCE(pix_price, regular_price) > 0')
                 ->orderByRaw('COALESCE(pix_price, regular_price) ASC')
@@ -37,6 +38,7 @@ class MonitoredProductsWidget extends Widget
             $lowestHistoricalObs = PriceObservation::query()
                 ->whereHas('source', fn ($q) => $q->where('product_id', $prod->id))
                 ->where('is_mismatch', false)
+                ->where('is_suspicious', false)
                 ->whereRaw('COALESCE(pix_price, regular_price) > 0')
                 ->orderByRaw('COALESCE(pix_price, regular_price) ASC')
                 ->first();
@@ -45,6 +47,7 @@ class MonitoredProductsWidget extends Widget
             $latestObs = PriceObservation::query()
                 ->whereHas('source', fn ($q) => $q->where('product_id', $prod->id))
                 ->where('is_mismatch', false)
+                ->where('is_suspicious', false)
                 ->whereRaw('COALESCE(pix_price, regular_price) > 0')
                 ->orderBy('collected_at', 'DESC')
                 ->first();
@@ -197,7 +200,7 @@ class MonitoredProductsWidget extends Widget
 
     public function discoverProduct(int $productId): void
     {
-        @set_time_limit(180);
+        @set_time_limit(120);
 
         $product = Product::find($productId);
         if (! $product) {
@@ -210,33 +213,18 @@ class MonitoredProductsWidget extends Widget
         }
 
         try {
-            $service = app(ProductDiscoveryService::class);
-            $result = $service->discoverForProduct($product, triggerType: 'manual');
-
-            // Collect fresh prices for active sources of this product
-            $pipeline = app(CollectionPipeline::class);
-            $collectedCount = 0;
-            foreach ($product->sources()->scrapable()->where('active', true)->get() as $source) {
-                try {
-                    $pipeline->run($source);
-                    $collectedCount++;
-                } catch (\Throwable $e) {
-                    // Ignore single source errors
-                }
-            }
-
-            $name = $product->commercial_name ?: $product->name;
-            $msg = "{$result['candidates_found']} ofertas analisadas: {$result['candidates_auto_approved']} auto-aprovadas, {$result['candidates_pending']} pendentes.";
-            if ($collectedCount > 0) {
-                $msg .= " Preços atualizados em {$collectedCount} fonte(s).";
-            }
+            $summary = app(ShoppingPriceRecorder::class)->record($product);
+            $best = $summary['best'];
 
             Notification::make()
-                ->title("Busca concluída: {$name}")
-                ->body($msg)
+                ->title('Busca concluída: '.($product->commercial_name ?: $product->name))
+                ->body("{$summary['listed']} ofertas no Google Shopping, {$summary['accepted']} do produto certo."
+                    .($best ? ' Melhor preço: R$ '.number_format((float) $best->regular_price, 2, ',', '.')." ({$best->seller})." : ''))
                 ->success()
                 ->send();
         } catch (\Throwable $e) {
+            Log::error('Falha na busca manual do Google Shopping', ['product_id' => $product->id, 'erro' => $e->getMessage()]);
+
             Notification::make()
                 ->title('Erro ao buscar ofertas')
                 ->body($e->getMessage())
@@ -259,39 +247,22 @@ class MonitoredProductsWidget extends Widget
             return;
         }
 
-        try {
-            $service = app(ProductDiscoveryService::class);
-            $pipeline = app(CollectionPipeline::class);
-            $totalFound = 0;
-            $totalApproved = 0;
-            $totalPending = 0;
+        $recorder = app(ShoppingPriceRecorder::class);
+        $failures = 0;
 
-            foreach ($products as $product) {
-                $result = $service->discoverForProduct($product, triggerType: 'manual');
-                $totalFound += $result['candidates_found'] ?? 0;
-                $totalApproved += $result['candidates_auto_approved'] ?? 0;
-                $totalPending += $result['candidates_pending'] ?? 0;
-
-                foreach ($product->sources()->scrapable()->where('active', true)->get() as $source) {
-                    try {
-                        $pipeline->run($source);
-                    } catch (\Throwable $e) {
-                        // Ignore single source errors
-                    }
-                }
+        foreach ($products as $product) {
+            try {
+                $recorder->record($product);
+            } catch (\Throwable $e) {
+                $failures++;
+                Log::error('Falha na busca manual do Google Shopping', ['product_id' => $product->id, 'erro' => $e->getMessage()]);
             }
-
-            Notification::make()
-                ->title('Busca finalizada para todos os produtos!')
-                ->body("{$totalFound} ofertas analisadas em {$products->count()} produtos ({$totalApproved} auto-aprovadas, {$totalPending} pendentes).")
-                ->success()
-                ->send();
-        } catch (\Throwable $e) {
-            Notification::make()
-                ->title('Erro ao buscar ofertas')
-                ->body($e->getMessage())
-                ->danger()
-                ->send();
         }
+
+        Notification::make()
+            ->title('Busca finalizada para todos os produtos!')
+            ->body("{$products->count()} produtos consultados no Google Shopping ({$recorder->creditsUsed()} créditos).".($failures > 0 ? " {$failures} falharam; veja o log." : ''))
+            ->color($failures > 0 ? 'warning' : 'success')
+            ->send();
     }
 }
