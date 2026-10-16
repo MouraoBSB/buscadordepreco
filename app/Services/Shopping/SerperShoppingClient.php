@@ -108,29 +108,30 @@ class SerperShoppingClient
      */
     public function findStoreUrl(ShoppingOffer $offer): ?string
     {
-        return $this->findStorePage($offer)['url'] ?? null;
+        return $this->findStorePages($offer)[0]['url'] ?? null;
     }
 
     /**
-     * Busca a página do produto no site da loja (1 crédito). Loja sem domínio conhecido só é aceita
+     * Busca páginas de produto no site da loja (1 crédito). Loja sem domínio conhecido só é aceita
      * quando o endereço do resultado contém o nome da loja, para não cair em outra loja.
      *
-     * @return array{url: string, title: string}|null
+     * @return array<int, array{url: string, title: string}>
      */
-    public function findStorePage(ShoppingOffer $offer): ?array
+    public function findStorePages(ShoppingOffer $offer, int $limit = 10): array
     {
         $domain = $this->domainForStore($offer->storeName);
         $storeSlug = preg_replace('/[^a-z0-9]/', '', Str::ascii(mb_strtolower($offer->storeName, 'UTF-8')));
 
         if ($domain === null && strlen($storeSlug) < 4) {
-            return null;
+            return [];
         }
 
         $query = $domain !== null
             ? "{$offer->title} site:{$domain}"
             : "{$offer->title} {$offer->storeName}";
 
-        $organicResults = $this->post('/search', ['q' => $query, 'num' => 5])['organic'] ?? [];
+        $organicResults = $this->post('/search', ['q' => $query, 'num' => $limit])['organic'] ?? [];
+        $pages = [];
 
         foreach ($organicResults as $result) {
             $link = $result['link'] ?? '';
@@ -148,13 +149,13 @@ class SerperShoppingClient
                 continue;
             }
 
-            return [
+            $pages[] = [
                 'url' => $this->stripTrackingParameters($link),
                 'title' => (string) ($result['title'] ?? ''),
             ];
         }
 
-        return null;
+        return $pages;
     }
 
     protected function isListingPage(string $url): bool

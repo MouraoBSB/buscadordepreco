@@ -14,6 +14,7 @@ use App\Models\Store;
 use App\Services\Alerts\AlertEvaluator;
 use App\Services\Discovery\CandidateValidator;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -26,14 +27,21 @@ class ShoppingPriceRecorder
     // Marketplaces conhecidos em que a maioria das ofertas é de vendedores terceiros
     protected const array ThirdPartyMarketplaces = ['shopee.com.br'];
 
-    // Por quantos dias o endereço encontrado (ou a falta dele) vale para a mesma oferta
+    // Por quantos dias o resultado da busca do endereço na loja vale para a mesma oferta
     protected const int DirectLinkCacheDays = 7;
+
+    // Quantas vezes tentar a próxima oferta quando a melhor se revela outro produto na página da loja
+    protected const int MaxOfferReplacements = 3;
+
+    // Páginas da loja abertas por oferta para achar a que tem o mesmo preço do Google
+    protected const int MaxPagesToVerify = 6;
 
     public function __construct(
         protected SerperShoppingClient $serper,
         protected ShoppingOfferMatcher $matcher,
         protected AlertEvaluator $alertEvaluator,
         protected CandidateValidator $validator,
+        protected OfferPageVerifier $pageVerifier,
     ) {}
 
     public function isConfigured(): bool
@@ -76,22 +84,13 @@ class ShoppingPriceRecorder
             ->unique(fn (array $result): string => mb_strtolower($result['offer']->storeName, 'UTF-8'))
             ->values();
 
-        $observations = DB::transaction(fn (): array => $cheapestPerStore
+        $observations = collect(DB::transaction(fn (): array => $cheapestPerStore
             ->map(fn (array $result): PriceObservation => $this->storeObservation($product, $result, $query, $collectedAt))
-            ->all());
+            ->all()));
 
-        // Alerta usa a melhor oferta de loja confiável; sem nenhuma, a melhor de qualquer loja
-        $candidates = collect($observations)
-            ->reject(fn (PriceObservation $observation): bool => $observation->is_suspicious)
-            ->sortBy(fn (PriceObservation $observation): float => (float) $observation->regular_price);
-        $best = $candidates->first(fn (PriceObservation $observation): bool => (bool) $observation->source->store?->isTrusted())
-            ?? $candidates->first();
-
-        // Endereço real da loja só para o que aparece no card e no alerta: a melhor oferta e a mais barata, se diferente
-        $cheapest = $candidates->first();
-        foreach (array_filter([$best, $cheapest !== $best ? $cheapest : null]) as $observation) {
-            $this->resolveDirectLink($product, $observation);
-        }
+        // Endereço real só para o que aparece no card e no alerta: a melhor oferta (loja confiável) e a mais barata
+        $best = $this->resolveUntilValid($product, fn (): ?PriceObservation => $this->bestOffer($observations));
+        $this->resolveUntilValid($product, fn (): ?PriceObservation => $this->validOffers($observations)->first());
 
         if ($best !== null) {
             try {
@@ -111,9 +110,58 @@ class ShoppingPriceRecorder
             'accepted' => $statusCount(ShoppingOfferMatcher::Accepted),
             'suspicious' => $statusCount(ShoppingOfferMatcher::Suspicious),
             'rejected' => $statusCount(ShoppingOfferMatcher::Rejected),
-            'recorded' => count($observations),
+            'recorded' => $observations->count(),
             'best' => $best,
         ];
+    }
+
+    /**
+     * @param  Collection<int, PriceObservation>  $observations
+     * @return Collection<int, PriceObservation>
+     */
+    protected function validOffers(Collection $observations): Collection
+    {
+        return $observations
+            ->reject(fn (PriceObservation $observation): bool => $observation->is_suspicious || $observation->is_mismatch)
+            ->sortBy(fn (PriceObservation $observation): float => (float) $observation->regular_price)
+            ->values();
+    }
+
+    /**
+     * Melhor oferta de loja confiável; sem nenhuma, a melhor de qualquer loja.
+     *
+     * @param  Collection<int, PriceObservation>  $observations
+     */
+    protected function bestOffer(Collection $observations): ?PriceObservation
+    {
+        $valid = $this->validOffers($observations);
+
+        return $valid->first(fn (PriceObservation $observation): bool => (bool) $observation->source->store?->isTrusted())
+            ?? $valid->first();
+    }
+
+    /**
+     * Resolve o endereço da oferta escolhida; se a página da loja revelar outro produto, passa para a próxima.
+     *
+     * @param  callable(): ?PriceObservation  $pick
+     */
+    protected function resolveUntilValid(Product $product, callable $pick): ?PriceObservation
+    {
+        for ($attempt = 0; $attempt < self::MaxOfferReplacements; $attempt++) {
+            $observation = $pick();
+
+            if ($observation === null) {
+                return null;
+            }
+
+            $this->resolveDirectLink($product, $observation);
+
+            if (! $observation->is_mismatch) {
+                return $observation;
+            }
+        }
+
+        return $pick();
     }
 
     /**
@@ -141,14 +189,15 @@ class ShoppingPriceRecorder
         );
 
         $title = Str::limit($offer->title, 495);
-        $cachedLookup = $this->cachedDirectLookup($source, $title);
+        $cached = $this->cachedDirectLookup($source, $title, $offer->price);
 
         $source->update([
-            'url' => $cachedLookup['direct_url'] ?? $offer->storeSearchLink(),
+            'url' => $cached['direct_url'] ?? $offer->storeSearchLink(),
             'last_checked_at' => $collectedAt,
         ]);
 
         $isSuspicious = $result['status'] === ShoppingOfferMatcher::Suspicious;
+        $rejection = $cached['direct_rejection'] ?? null;
 
         return PriceObservation::create([
             'product_source_id' => $source->id,
@@ -156,33 +205,35 @@ class ShoppingPriceRecorder
             'in_stock' => true,
             'seller' => $offer->storeName,
             'raw_title' => $title,
-            'is_mismatch' => false,
+            'is_mismatch' => $rejection !== null,
+            'mismatch_reason' => $rejection,
             'is_suspicious' => $isSuspicious,
             'sanity_check_reason' => $isSuspicious ? $result['reason'] : null,
             'collected_at' => $collectedAt,
-            'metadata' => [
+            'metadata' => array_merge([
                 'provider' => ProductSource::CollectorGoogleShopping,
                 'query' => $query,
                 'google_product_id' => $offer->googleProductId,
                 'google_link' => $offer->googleLink,
                 'store_link' => $offer->storeSearchLink(),
-                'direct_url' => $cachedLookup['direct_url'] ?? null,
-                'direct_lookup_at' => $cachedLookup['direct_lookup_at'] ?? null,
-            ],
+            ], $cached ?? []),
         ])->setRelation('source', $source->setRelation('store', $store));
     }
 
     /**
-     * Resultado de uma busca de endereço feita há menos de DirectLinkCacheDays para a mesma oferta (mesma fonte e título).
+     * Resultado da busca de endereço feita há menos de DirectLinkCacheDays para a mesma oferta (fonte, título e preço).
      *
-     * @return array{direct_url: string|null, direct_lookup_at: string}|null
+     * @return array{direct_url: string|null, direct_lookup_at: string, direct_verified: bool, direct_rejection: string|null, page_price: float|null}|null
      */
-    protected function cachedDirectLookup(ProductSource $source, string $title): ?array
+    protected function cachedDirectLookup(ProductSource $source, string $title, ?float $price): ?array
     {
         $previous = PriceObservation::query()
             ->where('product_source_id', $source->id)
             ->where('raw_title', $title)
+            ->where('regular_price', $price)
             ->whereNotNull('metadata->direct_lookup_at')
+            // Registros anteriores à checagem de preço na página (sem direct_verified) são buscados de novo
+            ->whereNotNull('metadata->direct_verified')
             ->latest('id')
             ->first();
 
@@ -192,11 +243,18 @@ class ShoppingPriceRecorder
             return null;
         }
 
-        return ['direct_url' => $previous->metadata['direct_url'] ?? null, 'direct_lookup_at' => $lookedUpAt];
+        return [
+            'direct_url' => $previous->metadata['direct_url'] ?? null,
+            'direct_lookup_at' => $lookedUpAt,
+            'direct_verified' => (bool) ($previous->metadata['direct_verified'] ?? false),
+            'direct_rejection' => $previous->metadata['direct_rejection'] ?? null,
+            'page_price' => $previous->metadata['page_price'] ?? null,
+        ];
     }
 
     /**
-     * Busca a página real do produto na loja (1 crédito) e aceita só se o título do resultado for do produto certo.
+     * Procura a página da oferta no site da loja (1 crédito) e abre as páginas encontradas (sem custo).
+     * A página com o mesmo preço do Google é o anúncio real: se for outro produto (ex.: usado), a oferta é descartada.
      */
     protected function resolveDirectLink(Product $product, PriceObservation $observation): void
     {
@@ -204,14 +262,10 @@ class ShoppingPriceRecorder
             return;
         }
 
-        $directUrl = null;
+        $price = (float) $observation->regular_price;
 
         try {
-            $page = $this->serper->findStorePage(new ShoppingOffer((string) $observation->raw_title, (string) $observation->seller, (float) $observation->regular_price));
-
-            if ($page !== null && $this->validator->validateListing($product, $page['title'])->isValid) {
-                $directUrl = $page['url'];
-            }
+            $pages = $this->serper->findStorePages(new ShoppingOffer((string) $observation->raw_title, (string) $observation->seller, $price));
         } catch (\Throwable $e) {
             Log::warning('Falha ao buscar o endereço da oferta na loja', [
                 'observation_id' => $observation->id,
@@ -222,13 +276,58 @@ class ShoppingPriceRecorder
             return;
         }
 
-        $observation->update(['metadata' => array_merge($observation->metadata ?? [], [
-            'direct_url' => $directUrl,
-            'direct_lookup_at' => Carbon::now()->toIso8601String(),
-        ])]);
+        $chosen = null;
+        $verified = false;
+        $rejection = null;
+        $pagePrices = [];
 
-        if ($directUrl !== null) {
-            $observation->source->update(['url' => $directUrl]);
+        foreach (array_slice($pages, 0, self::MaxPagesToVerify) as $page) {
+            $check = $this->pageVerifier->verify($page['url'], $price);
+            $pagePrices[$page['url']] = $check['page_price'];
+
+            if ($check['status'] !== OfferPageVerifier::Confirmed) {
+                continue;
+            }
+
+            $validation = $this->validator->validateListing($product, $page['title']);
+
+            if (! $validation->isValid) {
+                $rejection = "O anúncio da loja com este preço é outro produto: \"{$page['title']}\" ({$validation->rejectionReason})";
+            } else {
+                $chosen = $page;
+                $verified = true;
+            }
+
+            break;
+        }
+
+        // Nenhuma página com o mesmo preço (ex.: loja que bloqueia a leitura): primeira página do produto certo, sem garantia de preço
+        if ($chosen === null && $rejection === null) {
+            $chosen = collect($pages)->first(fn (array $page): bool => $this->validator->validateListing($product, $page['title'])->isValid);
+        }
+
+        $observation->update([
+            'is_mismatch' => $rejection !== null,
+            'mismatch_reason' => $rejection,
+            'metadata' => array_merge($observation->metadata ?? [], [
+                'direct_url' => $chosen['url'] ?? null,
+                'direct_lookup_at' => Carbon::now()->toIso8601String(),
+                'direct_verified' => $verified,
+                'direct_rejection' => $rejection,
+                'page_price' => $chosen !== null ? ($pagePrices[$chosen['url']] ?? null) : null,
+            ]),
+        ]);
+
+        if ($rejection !== null) {
+            Log::info('Oferta descartada: a página da loja com o mesmo preço é de outro produto', [
+                'observation_id' => $observation->id,
+                'loja' => $observation->seller,
+                'motivo' => $rejection,
+            ]);
+        }
+
+        if ($chosen !== null) {
+            $observation->source->update(['url' => $chosen['url']]);
         }
     }
 

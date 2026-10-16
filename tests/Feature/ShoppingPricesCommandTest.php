@@ -33,6 +33,13 @@ class ShoppingPricesCommandTest extends TestCase
      */
     protected array $organicResults = [];
 
+    /**
+     * Preço exibido em cada página de loja simulada (URL => preço); páginas ausentes respondem 404.
+     *
+     * @var array<string, float>
+     */
+    protected array $storePagePrices = [];
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -66,6 +73,9 @@ class ShoppingPricesCommandTest extends TestCase
                 'credits' => 2,
             ]),
             'google.serper.dev/search' => fn () => Http::response(['organic' => $this->organicResults, 'credits' => 1]),
+            '*' => fn ($request) => isset($this->storePagePrices[$request->url()])
+                ? Http::response($this->productPageHtml($this->storePagePrices[$request->url()]))
+                : Http::response('', 404),
         ]);
     }
 
@@ -129,6 +139,33 @@ class ShoppingPricesCommandTest extends TestCase
         $this->assertSame(2, Http::recorded(fn ($request): bool => str_contains($request->url(), '/search'))->count());
     }
 
+    public function test_discards_offer_whose_store_page_with_same_price_is_a_used_product(): void
+    {
+        // Caso real da KaBuM: o Google mostrou "Samsung Galaxy S25 5G 256GB" com o preço de um anúncio usado
+        $this->organicResults = [
+            ['link' => 'https://www.kabum.com.br/produto/703060/samsung-galaxy-s25-5g-256gb', 'title' => 'Samsung Galaxy S25 5G 256GB Galaxy AI Prata'],
+            ['link' => 'https://www.kabum.com.br/produto/947644/usado-samsung-galaxy-s25-256gb', 'title' => 'Usado - Samsung Galaxy S25 256gb - Azul Claro - Aceitável'],
+        ];
+        $this->storePagePrices = [
+            'https://www.kabum.com.br/produto/703060/samsung-galaxy-s25-5g-256gb' => 4500.00,
+            'https://www.kabum.com.br/produto/947644/usado-samsung-galaxy-s25-256gb' => 3899.00,
+        ];
+
+        $this->artisan('pricewatch:shopping')->assertSuccessful();
+        $this->artisan('pricewatch:shopping')->assertSuccessful();
+
+        $kabumObservations = PriceObservation::where('seller', 'KaBuM!')->get();
+        $this->assertCount(2, $kabumObservations);
+        $this->assertTrue($kabumObservations->every(fn (PriceObservation $observation): bool => $observation->is_mismatch));
+        $this->assertStringContainsString('Usado', $kabumObservations->first()->mismatch_reason);
+
+        // O alerta passa para a próxima loja confiável (Magalu)
+        $this->assertEquals(3999.00, Alert::sole()->payload['price']);
+
+        // 1ª rodada: KaBuM, Magalu e Outlet; 2ª rodada reaproveita os três resultados
+        $this->assertSame(3, Http::recorded(fn ($request): bool => str_contains($request->url(), '/search'))->count());
+    }
+
     public function test_store_page_with_title_of_another_product_is_discarded(): void
     {
         $this->organicResults = [
@@ -175,5 +212,16 @@ class ShoppingPricesCommandTest extends TestCase
         $this->assertFalse($result['ok']);
         $this->assertTrue($result['skipped']);
         Http::assertNotSent(fn ($request): bool => str_contains($request->url(), '/send/message'));
+    }
+
+    protected function productPageHtml(float $price): string
+    {
+        $jsonLd = json_encode([
+            '@context' => 'https://schema.org',
+            '@type' => 'Product',
+            'offers' => ['@type' => 'Offer', 'price' => $price, 'priceCurrency' => 'BRL', 'availability' => 'https://schema.org/InStock'],
+        ]);
+
+        return "<html><head><script type=\"application/ld+json\">{$jsonLd}</script></head><body></body></html>";
     }
 }

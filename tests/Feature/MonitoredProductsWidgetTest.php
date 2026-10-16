@@ -120,12 +120,13 @@ class MonitoredProductsWidgetTest extends TestCase
 
         // Com o endereço real encontrado, o card aponta para a loja
         PriceObservation::whereHas('source.store', fn ($query) => $query->where('name', 'KaBuM!'))
-            ->update(['metadata' => ['google_link' => 'https://www.google.com/search?ibp=oshop&prds=kabum', 'direct_url' => 'https://www.kabum.com.br/produto/703060']]);
+            ->update(['metadata' => ['google_link' => 'https://www.google.com/search?ibp=oshop&prds=kabum', 'direct_url' => 'https://www.kabum.com.br/produto/703060', 'page_price' => 3899.00]]);
 
         [$item] = (new MonitoredProductsWidget)->getProducts();
 
         $this->assertSame('https://www.kabum.com.br/produto/703060', $item['offer_url']);
         $this->assertTrue($item['offer_is_direct']);
+        $this->assertSame(3899.00, $item['offer_page_price']);
 
         // Com o mesmo preço da loja confiável não há o que avisar
         PriceObservation::whereHas('source.store', fn ($query) => $query->where('name', 'Outlet do Celular'))->update(['regular_price' => 3163.13]);

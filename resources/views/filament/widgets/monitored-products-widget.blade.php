@@ -88,6 +88,11 @@
                                             {{ $product['price_subtext'] }}
                                         </span>
                                     @endif
+                                    @if ($product['offer_page_price'])
+                                        <span style="display: block; font-size: 0.6875rem; color: #b45309; line-height: 1.15; margin-top: 0.125rem;" title="O preço do Google Shopping não bateu com o da página aberta da loja">
+                                            Na página da loja: R$ {{ number_format($product['offer_page_price'], 2, ',', '.') }}
+                                        </span>
+                                    @endif
                                 @else
                                     <span style="font-size: 0.75rem; font-weight: 600; color: #d97706; display: block; margin-top: 0.125rem;">
                                         Aguardando coleta

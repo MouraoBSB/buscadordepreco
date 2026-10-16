@@ -199,6 +199,7 @@ class MonitoredProductsWidget extends Widget
                 'current_price' => $price,
                 'offer_url' => $offerUrl,
                 'offer_is_direct' => $offerIsDirect,
+                'offer_page_price' => $this->divergentPagePrice($offerObs),
                 'offer_store' => $offerStore,
                 'compare_url' => ($lowestInStockObs ?? $winningObs)?->metadata['google_link'] ?? null,
                 'unverified_offer' => $unverifiedObs ? [
@@ -234,6 +235,21 @@ class MonitoredProductsWidget extends Widget
         return $observation->metadata['direct_url']
             ?? $observation->metadata['store_link']
             ?? $observation->source?->url;
+    }
+
+    /**
+     * Preço lido na página da loja quando difere do preço do Google (página aberta não confirmou a oferta).
+     */
+    protected function divergentPagePrice(?PriceObservation $observation): ?float
+    {
+        $pagePrice = $observation?->metadata['page_price'] ?? null;
+        $googlePrice = (float) $observation?->effective_price;
+
+        if ($pagePrice === null || $googlePrice <= 0 || abs((float) $pagePrice - $googlePrice) <= $googlePrice * 0.03) {
+            return null;
+        }
+
+        return (float) $pagePrice;
     }
 
     protected function isDirectLink(PriceObservation $observation): bool
