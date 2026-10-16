@@ -100,6 +100,29 @@ grátis (cerca de US$ 1 por 1.000, créditos expiram em 6 meses).
 
 ## Registro
 
+### 2026-10-16 (anúncio usado disfarçado de novo)
+- O card do S25 mostrava R$ 3.163,13 (KaBuM), mas a página aberta mostrava R$ 3.899,00.
+  - Investigação: dos anúncios do S25 256GB na KaBuM, o único a R$ 3.163,13 é **"Usado -
+    Samsung Galaxy S25 256gb - Azul Claro - Aceitável"** (`/produto/947644`). Os novos custam
+    R$ 3.899.
+  - **O Google Shopping cortou o "Usado" do título**, então o filtro por título não basta.
+  - A KaBuM permite ler a página pelo servidor (JSON-LD); a Magalu não (403).
+- Solução (`7255ec7`):
+  - `findStorePages()` devolve até 10 páginas; o gravador abre até 6 e escolhe a que tem o
+    **mesmo preço** do Google (`OfferPageVerifier`, tolerância de 3%).
+  - Se essa página for de outro produto (usado ou variante), a observação vira
+    `is_mismatch` e a escolha passa para a próxima oferta (`resolveUntilValid`).
+  - Sem página confirmada, mantém a primeira página do produto certo e guarda
+    `page_price`. O card mostra "Na página da loja: R$ X" quando há divergência.
+  - O cache inclui o preço e ignora registros sem `direct_verified`.
+- Correção `194add0`: o preço atual do card vem só da **última rodada** do Google Shopping
+  (antes era a janela de 24h, que mantinha uma oferta que já tinha sumido da busca).
+- Produção: 6 observações da KaBuM a R$ 3.163,13 foram marcadas `is_mismatch` (usado).
+  - O S25 passou a mostrar R$ 3.246,15 na Magalu, **sem confirmação possível** (403); também
+    está abaixo dos R$ 3.899 dos novos. Foi pedida conferência manual ao usuário.
+- Pendente: o "Menor histórico" ainda usa ofertas de lojas não verificadas e não
+  confirmadas (ex.: R$ 2.637,98 no S25).
+
 ### 2026-10-14 (link real da loja)
 - O usuário apontou que "Ver Oferta" também abria um agregador do Google. O Serper não
   devolve o endereço da loja no `/shopping`; só há links do Google.
