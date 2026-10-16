@@ -4,10 +4,12 @@ namespace App\Filament\Widgets;
 
 use App\Models\PriceObservation;
 use App\Models\Product;
+use App\Models\ProductSource;
 use App\Services\Coupons\CouponCalculatorService;
 use App\Services\Shopping\ShoppingPriceRecorder;
 use Filament\Notifications\Notification;
 use Filament\Widgets\Widget;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 
 class MonitoredProductsWidget extends Widget
@@ -18,7 +20,7 @@ class MonitoredProductsWidget extends Widget
 
     protected int|string|array $columnSpan = 'full';
 
-    // Janela do "preço atual": a busca roda 4x ao dia, então 24h cobre as últimas rodadas
+    // Sem rodada do Google Shopping neste período, o "preço atual" usa as observações das últimas 24h
     protected const int CurrentPriceWindowHours = 24;
 
     public function getProducts(): array
@@ -27,14 +29,21 @@ class MonitoredProductsWidget extends Widget
         $items = [];
 
         foreach ($products as $prod) {
-            // 1. Preço atual: observações recentes em estoque, com prioridade para loja confiável
+            // 1. Preço atual: ofertas da última rodada do Google Shopping (oferta que sumiu da busca não é atual);
+            // sem rodada recente, as observações das últimas 24h
+            $latestRunAt = PriceObservation::query()
+                ->whereHas('source', fn ($q) => $q->where('product_id', $prod->id)->where('collector_type', ProductSource::CollectorGoogleShopping))
+                ->where('collected_at', '>=', now()->subHours(self::CurrentPriceWindowHours))
+                ->max('collected_at');
+            $currentSince = $latestRunAt ? Carbon::parse($latestRunAt) : now()->subHours(self::CurrentPriceWindowHours);
+
             $currentQuery = fn () => PriceObservation::query()
                 ->with('source.store')
                 ->whereHas('source', fn ($q) => $q->where('product_id', $prod->id)->where('active', true))
                 ->where('is_mismatch', false)
                 ->where('is_suspicious', false)
                 ->where('in_stock', true)
-                ->where('collected_at', '>=', now()->subHours(self::CurrentPriceWindowHours))
+                ->where('collected_at', '>=', $currentSince)
                 ->whereRaw('COALESCE(pix_price, regular_price) > 0')
                 ->orderByRaw('COALESCE(pix_price, regular_price) ASC')
                 ->orderByDesc('collected_at')

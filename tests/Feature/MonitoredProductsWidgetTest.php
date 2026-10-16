@@ -136,6 +136,28 @@ class MonitoredProductsWidgetTest extends TestCase
         $this->assertNull($item['unverified_offer']);
     }
 
+    public function test_widget_current_price_uses_only_the_latest_google_shopping_run(): void
+    {
+        $product = Product::create(['name' => 'Galaxy S25', 'image_url' => 'https://exemplo.test/s25.png', 'active' => true]);
+
+        foreach ([['KaBuM!', 'kabum.com.br', 3163.13, now()->subHours(14)], ['Magalu', 'magazineluiza.com.br', 3246.15, now()]] as [$name, $domain, $price, $collectedAt]) {
+            $source = ProductSource::create([
+                'product_id' => $product->id,
+                'store_id' => Store::create(['name' => $name, 'domain' => $domain])->id,
+                'url' => "https://{$domain}/produto",
+                'collector_type' => ProductSource::CollectorGoogleShopping,
+                'active' => true,
+            ]);
+            PriceObservation::create(['product_source_id' => $source->id, 'regular_price' => $price, 'in_stock' => true, 'collected_at' => $collectedAt]);
+        }
+
+        [$item] = (new MonitoredProductsWidget)->getProducts();
+
+        // A KaBuM não apareceu na rodada mais recente: não é mais o preço atual
+        $this->assertEquals(3246.15, $item['current_price']);
+        $this->assertSame('Magalu', $item['offer_store']);
+    }
+
     public function test_widget_current_price_ignores_offers_older_than_24_hours(): void
     {
         $product = Product::create(['name' => 'Galaxy S25', 'image_url' => 'https://exemplo.test/s25.png', 'active' => true]);
